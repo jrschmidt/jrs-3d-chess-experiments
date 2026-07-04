@@ -22,35 +22,35 @@ const V_RANK = { x: COS30 * PITCH, y: -SIN30 * PITCH };
 const V_LEVEL = { x: 0, y: -PITCH };
 
 const pieces = {
-  key(rank, level, slice) { return `${rank},${level},${slice}`; },
+  key: (rank, level, slice) => `${rank},${level},${slice}`,
 };
 const pieceData = new Map([
   [pieces.key(3, 3, 3), { shape: "triangle" }],
 ]);
 
-function add(...vecs) {
+const add = (...vecs) => {
   return vecs.reduce((a, v) => ({ x: a.x + v.x, y: a.y + v.y }), { x: 0, y: 0 });
-}
-function scale(v, s) {
+};
+const scale = (v, s) => {
   return { x: v.x * s, y: v.y * s };
-}
-function neg(v) {
+};
+const neg = (v) => {
   return scale(v, -1);
-}
+};
 
-function projectCenter(rank, level, slice) {
+const projectCenter = (rank, level, slice) => {
   const depth = RANK_MAX + 1 - rank;
   return {
     x: (slice - depth) * COS30 * PITCH,
     y: (slice + depth) * SIN30 * PITCH - level * PITCH,
   };
-}
+};
 
-function pointsAttr(corners) {
+const pointsAttr = (corners) => {
   return corners.map((c) => `${c.x.toFixed(2)},${c.y.toFixed(2)}`).join(" ");
-}
+};
 
-function cubeFaces(center) {
+const cubeFaces = (center) => {
   const vs = scale(V_SLICE, HALF);
   const vr = scale(V_RANK, HALF);
   const vl = scale(V_LEVEL, HALF);
@@ -76,24 +76,24 @@ function cubeFaces(center) {
     add(center, vs, neg(vr), vl),
   ];
   return { top, front, right };
-}
+};
 
 const SVG_NS = "http://www.w3.org/2000/svg";
-function svgEl(tag, attrs) {
+const svgEl = (tag, attrs) => {
   const el = document.createElementNS(SVG_NS, tag);
   for (const [k, v] of Object.entries(attrs)) el.setAttribute(k, v);
   return el;
-}
+};
 
-function triangleIconPoints(center, r) {
+const triangleIconPoints = (center, r) => {
   return [
     { x: center.x, y: center.y - r },
     { x: center.x + r * COS30, y: center.y + r * 0.5 },
     { x: center.x - r * COS30, y: center.y + r * 0.5 },
   ];
-}
+};
 
-function buildScene() {
+const buildScene = () => {
   const svg = document.getElementById("scene");
   const gridGroup = svgEl("g", { id: "grid" });
   const iconGroup = svgEl("g", { id: "icons" });
@@ -167,6 +167,6 @@ function buildScene() {
   const vbW = (maxX - minX) + pad * 2, vbH = (maxY - minY) + pad * 2;
   svg.setAttribute("viewBox", `${vbX} ${vbY} ${vbW} ${vbH}`);
   svg.setAttribute("preserveAspectRatio", "xMidYMid meet");
-}
+};
 
 buildScene();
