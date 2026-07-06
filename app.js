@@ -16,9 +16,12 @@ const COS30 = Math.sqrt(3) / 2;
 const SIN30 = 0.5;
 
 // Per-unit-step screen-space basis vectors, derived from the isometric projection
-// (slice - depth) * cos30, (slice + depth) * sin30 - level, where depth = RANK_MAX + 1 - rank.
-const V_SLICE = { x: COS30 * PITCH, y: SIN30 * PITCH };
-const V_RANK = { x: COS30 * PITCH, y: -SIN30 * PITCH };
+// (slice - rank) * cos30, -(rank + slice) * sin30 - level. This puts the
+// rank=max/slice=max corner (back-right) at the top of the view and the
+// rank=max/slice=1 corner (back-left) at the left — i.e. the viewer faces the
+// right-front face of the cube, with the left-rear face away from them.
+const V_SLICE = { x: COS30 * PITCH, y: -SIN30 * PITCH };
+const V_RANK = { x: -COS30 * PITCH, y: -SIN30 * PITCH };
 const V_LEVEL = { x: 0, y: -PITCH };
 
 const add = (...vecs) => {
@@ -29,10 +32,9 @@ const scale = (v, s) => {
 };
 
 const projectCenter = (rank, level, slice) => {
-  const depth = RANK_MAX + 1 - rank;
   return {
-    x: (slice - depth) * COS30 * PITCH,
-    y: (slice + depth) * SIN30 * PITCH - level * PITCH,
+    x: (slice - rank) * COS30 * PITCH,
+    y: -(rank + slice) * SIN30 * PITCH - level * PITCH,
   };
 };
 
