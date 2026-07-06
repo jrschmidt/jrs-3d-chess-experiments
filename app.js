@@ -12,6 +12,8 @@ const PITCH = 70;        // world-unit distance between adjacent cube centers (i
 const CUBE_FRACTION = 0.42; // fraction of PITCH each cube face actually occupies (rest is the "explode" gap)
 const HALF = CUBE_FRACTION / 2;
 
+const SHOW_CUBES = false; // set true to re-enable cube-face rendering
+
 const COS30 = Math.sqrt(3) / 2;
 const SIN30 = 0.5;
 
@@ -20,13 +22,6 @@ const SIN30 = 0.5;
 const V_SLICE = { x: COS30 * PITCH, y: SIN30 * PITCH };
 const V_RANK = { x: COS30 * PITCH, y: -SIN30 * PITCH };
 const V_LEVEL = { x: 0, y: -PITCH };
-
-const pieces = {
-  key: (rank, level, slice) => `${rank},${level},${slice}`,
-};
-const pieceData = new Map([
-  [pieces.key(3, 3, 3), { shape: "triangle" }],
-]);
 
 const add = (...vecs) => {
   return vecs.reduce((a, v) => ({ x: a.x + v.x, y: a.y + v.y }), { x: 0, y: 0 });
@@ -112,19 +107,10 @@ const svgEl = (tag, attrs) => {
   return el;
 };
 
-const triangleIconPoints = (center, r) => {
-  return [
-    { x: center.x, y: center.y - r },
-    { x: center.x + r * COS30, y: center.y + r * 0.5 },
-    { x: center.x - r * COS30, y: center.y + r * 0.5 },
-  ];
-};
-
 const buildScene = () => {
   const svg = document.getElementById("scene");
   const floorGroup = svgEl("g", { id: "floors" });
   const gridGroup = svgEl("g", { id: "grid" });
-  const iconGroup = svgEl("g", { id: "icons" });
 
   let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
 
@@ -155,29 +141,29 @@ const buildScene = () => {
   cells.sort((a, b) => a.center.y - b.center.y);
 
   for (const cell of cells) {
-    const { rank, level, slice, center } = cell;
-    const isPiece = pieceData.has(pieces.key(rank, level, slice));
+    const { center } = cell;
     const faces = cubeFaces(center);
 
-    const strokeColor = isPiece ? "rgba(255,180,140,0.55)" : "rgba(210,225,255,0.30)";
-    gridGroup.appendChild(svgEl("polygon", {
-      points: pointsAttr(faces.top),
-      fill: isPiece ? "rgba(255,150,100,0.12)" : "rgba(210,225,255,0.10)",
-      stroke: strokeColor,
-      "stroke-width": 1,
-    }));
-    gridGroup.appendChild(svgEl("polygon", {
-      points: pointsAttr(faces.front),
-      fill: isPiece ? "rgba(255,150,100,0.09)" : "rgba(210,225,255,0.07)",
-      stroke: strokeColor,
-      "stroke-width": 1,
-    }));
-    gridGroup.appendChild(svgEl("polygon", {
-      points: pointsAttr(faces.right),
-      fill: isPiece ? "rgba(255,150,100,0.06)" : "rgba(210,225,255,0.05)",
-      stroke: strokeColor,
-      "stroke-width": 1,
-    }));
+    if (SHOW_CUBES) {
+      gridGroup.appendChild(svgEl("polygon", {
+        points: pointsAttr(faces.top),
+        fill: "rgba(210,225,255,0.10)",
+        stroke: "rgba(210,225,255,0.30)",
+        "stroke-width": 1,
+      }));
+      gridGroup.appendChild(svgEl("polygon", {
+        points: pointsAttr(faces.front),
+        fill: "rgba(210,225,255,0.07)",
+        stroke: "rgba(210,225,255,0.30)",
+        "stroke-width": 1,
+      }));
+      gridGroup.appendChild(svgEl("polygon", {
+        points: pointsAttr(faces.right),
+        fill: "rgba(210,225,255,0.05)",
+        stroke: "rgba(210,225,255,0.30)",
+        "stroke-width": 1,
+      }));
+    }
 
     for (const face of [faces.top, faces.front, faces.right]) {
       for (const p of face) {
@@ -185,26 +171,10 @@ const buildScene = () => {
         minY = Math.min(minY, p.y); maxY = Math.max(maxY, p.y);
       }
     }
-
-    const piece = pieceData.get(pieces.key(rank, level, slice));
-    if (piece) {
-      const topCenter = add(center, scale(V_LEVEL, HALF));
-      if (piece.shape === "triangle") {
-        const tri = triangleIconPoints(topCenter, PITCH * 0.22);
-        iconGroup.appendChild(svgEl("polygon", {
-          points: pointsAttr(tri),
-          fill: "#ff7a4d",
-          stroke: "#ffe3d5",
-          "stroke-width": 1.5,
-          "stroke-linejoin": "round",
-        }));
-      }
-    }
   }
 
   svg.appendChild(floorGroup);
   svg.appendChild(gridGroup);
-  svg.appendChild(iconGroup);
 
   const pad = PITCH * 0.6;
   const vbX = minX - pad, vbY = minY - pad;
