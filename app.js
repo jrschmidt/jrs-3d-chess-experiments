@@ -1,5 +1,5 @@
-// 5x5x5 exploded isometric cube grid prototype.
-// Coordinate system: (rank, level, slice) — see plan doc for full definition.
+// A single 5x5x5 cube, rendered in isometric view. (rank, level, slice) are
+// coordinates of a cell within that one cube — see plan doc for full definition.
 //   rank  1..RANK_MAX   1 = front,  RANK_MAX = back
 //   level 1..LEVEL_MAX  1 = bottom, LEVEL_MAX = top
 //   slice 1..SLICE_MAX  1 = left (as seen from front), SLICE_MAX = right
@@ -8,11 +8,9 @@ const RANK_MAX = 5;
 const LEVEL_MAX = 5;
 const SLICE_MAX = 5;
 
-const PITCH = 70;        // world-unit distance between adjacent cube centers (includes gap)
-const CUBE_FRACTION = 0.42; // fraction of PITCH each cube face actually occupies (rest is the "explode" gap)
-const HALF = CUBE_FRACTION / 2;
-
-const SHOW_CUBES = false; // set true to re-enable cube-face rendering
+const PITCH = 70;         // world-unit distance between adjacent cell coordinates
+const CELL_FRACTION = 0.42; // fraction of PITCH each cell's rendered face occupies
+const HALF = CELL_FRACTION / 2;
 
 const COS30 = Math.sqrt(3) / 2;
 const SIN30 = 0.5;
@@ -29,9 +27,6 @@ const add = (...vecs) => {
 const scale = (v, s) => {
   return { x: v.x * s, y: v.y * s };
 };
-const neg = (v) => {
-  return scale(v, -1);
-};
 
 const projectCenter = (rank, level, slice) => {
   const depth = RANK_MAX + 1 - rank;
@@ -45,39 +40,11 @@ const pointsAttr = (corners) => {
   return corners.map((c) => `${c.x.toFixed(2)},${c.y.toFixed(2)}`).join(" ");
 };
 
-const cubeFaces = (center) => {
-  const vs = scale(V_SLICE, HALF);
-  const vr = scale(V_RANK, HALF);
-  const vl = scale(V_LEVEL, HALF);
-
-  const top = [
-    add(center, vl, vs, vr),
-    add(center, vl, vs, neg(vr)),
-    add(center, vl, neg(vs), neg(vr)),
-    add(center, vl, neg(vs), vr),
-  ];
-  // front face: the rank-minimum (near/front) side
-  const front = [
-    add(center, neg(vr), vs, vl),
-    add(center, neg(vr), vs, neg(vl)),
-    add(center, neg(vr), neg(vs), neg(vl)),
-    add(center, neg(vr), neg(vs), vl),
-  ];
-  // right face: the slice-maximum (right, as seen from front) side
-  const right = [
-    add(center, vs, vr, vl),
-    add(center, vs, vr, neg(vl)),
-    add(center, vs, neg(vr), neg(vl)),
-    add(center, vs, neg(vr), vl),
-  ];
-  return { top, front, right };
-};
-
 // A "floor" is a thin outline tracing the full rank x slice perimeter of each
-// level — a subtle visual aid for telling the five levels apart in the
-// exploded view. (A filled full-footprint plane was tried first, but adjacent
-// levels' planes overlapped almost completely on screen since the rank/slice
-// extent is much wider than one level's vertical spacing.)
+// level — a subtle visual aid for telling the five levels of the cube apart.
+// (A filled full-footprint plane was tried first, but adjacent levels' planes
+// overlapped almost completely on screen since the rank/slice extent is much
+// wider than one level's vertical spacing.)
 const FLOOR_COLORS = {
   1: "rgba(215,212,140,0.5)",
   2: "rgba(170,215,140,0.5)",
@@ -110,7 +77,6 @@ const svgEl = (tag, attrs) => {
 const buildScene = () => {
   const svg = document.getElementById("scene");
   const floorGroup = svgEl("g", { id: "floors" });
-  const gridGroup = svgEl("g", { id: "grid" });
 
   let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
 
@@ -129,52 +95,7 @@ const buildScene = () => {
     }
   }
 
-  const cells = [];
-  for (let rank = 1; rank <= RANK_MAX; rank++) {
-    for (let level = 1; level <= LEVEL_MAX; level++) {
-      for (let slice = 1; slice <= SLICE_MAX; slice++) {
-        cells.push({ rank, level, slice, center: projectCenter(rank, level, slice) });
-      }
-    }
-  }
-  // simple back-to-front paint order: farther/higher cubes first, nearer ones last
-  cells.sort((a, b) => a.center.y - b.center.y);
-
-  for (const cell of cells) {
-    const { center } = cell;
-    const faces = cubeFaces(center);
-
-    if (SHOW_CUBES) {
-      gridGroup.appendChild(svgEl("polygon", {
-        points: pointsAttr(faces.top),
-        fill: "rgba(210,225,255,0.10)",
-        stroke: "rgba(210,225,255,0.30)",
-        "stroke-width": 1,
-      }));
-      gridGroup.appendChild(svgEl("polygon", {
-        points: pointsAttr(faces.front),
-        fill: "rgba(210,225,255,0.07)",
-        stroke: "rgba(210,225,255,0.30)",
-        "stroke-width": 1,
-      }));
-      gridGroup.appendChild(svgEl("polygon", {
-        points: pointsAttr(faces.right),
-        fill: "rgba(210,225,255,0.05)",
-        stroke: "rgba(210,225,255,0.30)",
-        "stroke-width": 1,
-      }));
-    }
-
-    for (const face of [faces.top, faces.front, faces.right]) {
-      for (const p of face) {
-        minX = Math.min(minX, p.x); maxX = Math.max(maxX, p.x);
-        minY = Math.min(minY, p.y); maxY = Math.max(maxY, p.y);
-      }
-    }
-  }
-
   svg.appendChild(floorGroup);
-  svg.appendChild(gridGroup);
 
   const pad = PITCH * 0.6;
   const vbX = minX - pad, vbY = minY - pad;
