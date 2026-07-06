@@ -78,6 +78,33 @@ const cubeFaces = (center) => {
   return { top, front, right };
 };
 
+// A "floor" is a thin outline tracing the full rank x slice perimeter of each
+// level — a subtle visual aid for telling the five levels apart in the
+// exploded view. (A filled full-footprint plane was tried first, but adjacent
+// levels' planes overlapped almost completely on screen since the rank/slice
+// extent is much wider than one level's vertical spacing.)
+const FLOOR_COLORS = {
+  1: "rgba(215,212,140,0.5)",
+  2: "rgba(170,215,140,0.5)",
+  3: "rgba(140,215,159,0.5)",
+  4: "rgba(140,215,205,0.5)",
+  5: "rgba(140,177,215,0.5)",
+};
+
+const floorPerimeter = (level) => {
+  const drop = scale(V_LEVEL, -HALF);
+  const rMin = scale(V_RANK, -HALF);
+  const rMax = scale(V_RANK, HALF);
+  const sMin = scale(V_SLICE, -HALF);
+  const sMax = scale(V_SLICE, HALF);
+
+  const frontLeft = add(projectCenter(1, level, 1), rMin, sMin, drop);
+  const frontRight = add(projectCenter(1, level, SLICE_MAX), rMin, sMax, drop);
+  const backRight = add(projectCenter(RANK_MAX, level, SLICE_MAX), rMax, sMax, drop);
+  const backLeft = add(projectCenter(RANK_MAX, level, 1), rMax, sMin, drop);
+  return [frontLeft, frontRight, backRight, backLeft];
+};
+
 const SVG_NS = "http://www.w3.org/2000/svg";
 const svgEl = (tag, attrs) => {
   const el = document.createElementNS(SVG_NS, tag);
@@ -95,8 +122,26 @@ const triangleIconPoints = (center, r) => {
 
 const buildScene = () => {
   const svg = document.getElementById("scene");
+  const floorGroup = svgEl("g", { id: "floors" });
   const gridGroup = svgEl("g", { id: "grid" });
   const iconGroup = svgEl("g", { id: "icons" });
+
+  let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+
+  for (let level = 1; level <= LEVEL_MAX; level++) {
+    const corners = floorPerimeter(level);
+    floorGroup.appendChild(svgEl("polygon", {
+      points: pointsAttr(corners),
+      fill: "none",
+      stroke: FLOOR_COLORS[level],
+      "stroke-width": 2,
+      "stroke-linejoin": "round",
+    }));
+    for (const p of corners) {
+      minX = Math.min(minX, p.x); maxX = Math.max(maxX, p.x);
+      minY = Math.min(minY, p.y); maxY = Math.max(maxY, p.y);
+    }
+  }
 
   const cells = [];
   for (let rank = 1; rank <= RANK_MAX; rank++) {
@@ -108,8 +153,6 @@ const buildScene = () => {
   }
   // simple back-to-front paint order: farther/higher cubes first, nearer ones last
   cells.sort((a, b) => a.center.y - b.center.y);
-
-  let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
 
   for (const cell of cells) {
     const { rank, level, slice, center } = cell;
@@ -159,6 +202,7 @@ const buildScene = () => {
     }
   }
 
+  svg.appendChild(floorGroup);
   svg.appendChild(gridGroup);
   svg.appendChild(iconGroup);
 
