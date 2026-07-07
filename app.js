@@ -9,7 +9,7 @@ const LEVEL_MAX = 5;
 const SLICE_MAX = 5;
 
 const PITCH = 70;         // world-unit distance between adjacent cell coordinates
-const CELL_FRACTION = 0.42; // fraction of PITCH each cell's rendered face occupies
+const CELL_FRACTION = 1;    // fraction of PITCH each cell's floor occupies (1 = cells abut, no gap)
 const HALF = CELL_FRACTION / 2;
 
 const COS30 = Math.sqrt(3) / 2;
@@ -69,6 +69,33 @@ const floorPerimeter = (level) => {
   return [frontLeft, frontRight, backRight, backLeft];
 };
 
+// The footprint of a single cell's floor, in the same corner order as
+// floorPerimeter (front-left, front-right, back-right, back-left).
+const cellFootprint = (rank, level, slice) => {
+  const drop = scale(V_LEVEL, -HALF);
+  const rMin = scale(V_RANK, -HALF);
+  const rMax = scale(V_RANK, HALF);
+  const sMin = scale(V_SLICE, -HALF);
+  const sMax = scale(V_SLICE, HALF);
+  const center = projectCenter(rank, level, slice);
+
+  return [
+    add(center, rMin, sMin, drop),
+    add(center, rMin, sMax, drop),
+    add(center, rMax, sMax, drop),
+    add(center, rMax, sMin, drop),
+  ];
+};
+
+// Checkerboard parity: a cell is "dark" when rank + level + slice is odd.
+const isDarkCell = (rank, level, slice) => (rank + level + slice) % 2 === 1;
+
+// Per-level checkerboard colors. Only level 1 is populated for now; later
+// levels can be added here without touching the rendering logic.
+const CHECKER_COLORS = {
+  1: { dark: "rgb(77,75,51)", light: "rgb(212,212,140)" },
+};
+
 const SVG_NS = "http://www.w3.org/2000/svg";
 const svgEl = (tag, attrs) => {
   const el = document.createElementNS(SVG_NS, tag);
@@ -78,9 +105,28 @@ const svgEl = (tag, attrs) => {
 
 const buildScene = () => {
   const svg = document.getElementById("scene");
+  const checkerGroup = svgEl("g", { id: "checkers" });
   const floorGroup = svgEl("g", { id: "floors" });
 
   let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+
+  for (const level of Object.keys(CHECKER_COLORS).map(Number)) {
+    const colors = CHECKER_COLORS[level];
+    for (let rank = 1; rank <= RANK_MAX; rank++) {
+      for (let slice = 1; slice <= SLICE_MAX; slice++) {
+        const corners = cellFootprint(rank, level, slice);
+        checkerGroup.appendChild(svgEl("polygon", {
+          points: pointsAttr(corners),
+          fill: isDarkCell(rank, level, slice) ? colors.dark : colors.light,
+          stroke: "none",
+        }));
+        for (const p of corners) {
+          minX = Math.min(minX, p.x); maxX = Math.max(maxX, p.x);
+          minY = Math.min(minY, p.y); maxY = Math.max(maxY, p.y);
+        }
+      }
+    }
+  }
 
   for (let level = 1; level <= LEVEL_MAX; level++) {
     const corners = floorPerimeter(level);
@@ -88,7 +134,7 @@ const buildScene = () => {
       points: pointsAttr(corners),
       fill: "none",
       stroke: FLOOR_COLORS[level],
-      "stroke-width": 2,
+      "stroke-width": 5,
       "stroke-linejoin": "round",
     }));
     for (const p of corners) {
@@ -97,6 +143,7 @@ const buildScene = () => {
     }
   }
 
+  svg.appendChild(checkerGroup);
   svg.appendChild(floorGroup);
 
   const pad = PITCH * 0.6;
