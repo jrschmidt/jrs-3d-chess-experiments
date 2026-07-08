@@ -8,6 +8,29 @@ const RANK_MAX = 5;
 const LEVEL_MAX = 5;
 const SLICE_MAX = 5;
 
+// A "floor" is a thin outline tracing the full rank x slice perimeter of each
+// level — a subtle visual aid for telling the five levels of the cube apart.
+// (A filled full-footprint plane was tried first, but adjacent levels' planes
+// overlapped almost completely on screen since the rank/slice extent is much
+// wider than one level's vertical spacing.)
+const PERIMETER_COLORS = {
+  1: "rgba(215,212,140,0.5)",
+  2: "rgba(170,215,140,0.5)",
+  3: "rgba(140,215,159,0.5)",
+  4: "rgba(140,215,205,0.5)",
+  5: "rgba(140,177,215,0.5)",
+};
+
+// Per-level checkerboard colors. Only level 1 is populated for now; later
+// levels can be added here without touching the rendering logic.
+const CHECKER_COLORS = {
+  1: { dark: "rgb(51,51,51)", light: "rgb(204,204,204)" },
+  2: { dark: "rgba(51,51,51,0.1)", light: "rgba(204,204,204,0.1)" },
+  3: { dark: "rgba(51,51,51,0.1)", light: "rgba(204,204,204,0.1)" },
+  4: { dark: "rgba(51,51,51,0.1)", light: "rgba(204,204,204,0.1)" },
+  5: { dark: "rgba(51,51,51,0.1)", light: "rgba(204,204,204,0.1)" },
+};
+
 const PITCH = 70;         // world-unit distance between adjacent cell coordinates
 const CELL_FRACTION = 1;    // fraction of PITCH each cell's floor occupies (1 = cells abut, no gap)
 const HALF = CELL_FRACTION / 2;
@@ -40,19 +63,6 @@ const projectCenter = (rank, level, slice) => {
 
 const pointsAttr = (corners) => {
   return corners.map((c) => `${c.x.toFixed(2)},${c.y.toFixed(2)}`).join(" ");
-};
-
-// A "floor" is a thin outline tracing the full rank x slice perimeter of each
-// level — a subtle visual aid for telling the five levels of the cube apart.
-// (A filled full-footprint plane was tried first, but adjacent levels' planes
-// overlapped almost completely on screen since the rank/slice extent is much
-// wider than one level's vertical spacing.)
-const FLOOR_COLORS = {
-  1: "rgba(215,212,140,0.5)",
-  2: "rgba(170,215,140,0.5)",
-  3: "rgba(140,215,159,0.5)",
-  4: "rgba(140,215,205,0.5)",
-  5: "rgba(140,177,215,0.5)",
 };
 
 const floorPerimeter = (level) => {
@@ -89,12 +99,6 @@ const cellFootprint = (rank, level, slice) => {
 
 // Checkerboard parity: a cell is "dark" when rank + level + slice is odd.
 const isDarkCell = (rank, level, slice) => (rank + level + slice) % 2 === 1;
-
-// Per-level checkerboard colors. Only level 1 is populated for now; later
-// levels can be added here without touching the rendering logic.
-const CHECKER_COLORS = {
-  1: { dark: "rgb(51,51,51)", light: "rgb(204,204,204)" },
-};
 
 const SVG_NS = "http://www.w3.org/2000/svg";
 const svgEl = (tag, attrs) => {
@@ -133,7 +137,7 @@ const buildScene = () => {
     floorGroup.appendChild(svgEl("polygon", {
       points: pointsAttr(corners),
       fill: "none",
-      stroke: FLOOR_COLORS[level],
+      stroke: PERIMETER_COLORS[level],
       "stroke-width": 5,
       "stroke-linejoin": "round",
     }));
