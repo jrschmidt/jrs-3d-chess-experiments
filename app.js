@@ -35,16 +35,18 @@ const PITCH = 70;         // world-unit distance between adjacent cell coordinat
 const CELL_FRACTION = 1;    // fraction of PITCH each cell's floor occupies (1 = cells abut, no gap)
 const HALF = CELL_FRACTION / 2;
 
-const COS30 = Math.sqrt(3) / 2;
-const SIN30 = 0.5;
+const TILT_DEGREES = 20; // isometric tilt angle; try other values freely
+const TILT_RAD = TILT_DEGREES * Math.PI / 180;
+const COS_TILT = Math.cos(TILT_RAD);
+const SIN_TILT = Math.sin(TILT_RAD);
 
 // Per-unit-step screen-space basis vectors, derived from the isometric projection
-// (slice - rank) * cos30, -(rank + slice) * sin30 - level. This puts the
-// rank=max/slice=max corner (back-right) at the top of the view and the
+// (slice - rank) * cos(tilt), -(rank + slice) * sin(tilt) - level. This puts
+// the rank=max/slice=max corner (back-right) at the top of the view and the
 // rank=max/slice=1 corner (back-left) at the left — i.e. the viewer faces the
 // right-front face of the cube, with the left-rear face away from them.
-const V_SLICE = { x: COS30 * PITCH, y: -SIN30 * PITCH };
-const V_RANK = { x: -COS30 * PITCH, y: -SIN30 * PITCH };
+const V_SLICE = { x: COS_TILT * PITCH, y: -SIN_TILT * PITCH };
+const V_RANK = { x: -COS_TILT * PITCH, y: -SIN_TILT * PITCH };
 const V_LEVEL = { x: 0, y: -PITCH };
 
 const add = (...vecs) => {
@@ -56,8 +58,8 @@ const scale = (v, s) => {
 
 const projectCenter = (rank, level, slice) => {
   return {
-    x: (slice - rank) * COS30 * PITCH,
-    y: -(rank + slice) * SIN30 * PITCH - level * PITCH,
+    x: (slice - rank) * COS_TILT * PITCH,
+    y: -(rank + slice) * SIN_TILT * PITCH - level * PITCH,
   };
 };
 
