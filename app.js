@@ -93,7 +93,7 @@ const isDarkCell = (rank, level, slice) => (rank + level + slice) % 2 === 1;
 // Per-level checkerboard colors. Only level 1 is populated for now; later
 // levels can be added here without touching the rendering logic.
 const CHECKER_COLORS = {
-  1: { dark: "rgb(77,75,51)", light: "rgb(212,212,140)" },
+  1: { dark: "rgb(51,51,51)", light: "rgb(204,204,204)" },
 };
 
 const SVG_NS = "http://www.w3.org/2000/svg";
