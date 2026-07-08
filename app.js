@@ -1,10 +1,10 @@
-// A single 5x5x5 cube, rendered in isometric view. (rank, level, slice) are
+// A single 5x5x8 cube, rendered in isometric view. (rank, level, slice) are
 // coordinates of a cell within that one cube — see plan doc for full definition.
 //   rank  1..RANK_MAX   1 = front,  RANK_MAX = back
 //   level 1..LEVEL_MAX  1 = bottom, LEVEL_MAX = top
 //   slice 1..SLICE_MAX  1 = left (as seen from front), SLICE_MAX = right
 
-const RANK_MAX = 5;
+const RANK_MAX = 8;
 const LEVEL_MAX = 5;
 const SLICE_MAX = 5;
 
