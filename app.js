@@ -1,17 +1,19 @@
-// A single 5x5x8 cube, rendered in isometric view. (rank, level, slice) are
+// A single 5x5x8 cube, rendered in isometric view. (rank, level, file) are
 // coordinates of a cell within that one cube — see plan doc for full definition.
-//   rank  1..RANK_MAX   1 = front,  RANK_MAX = back
 //   level 1..LEVEL_MAX  1 = bottom, LEVEL_MAX = top
-//   slice 1..SLICE_MAX  1 = left (as seen from front), SLICE_MAX = right
+//   rank  1..RANK_MAX   1 = front,  RANK_MAX = back
+//   file  1..FILE_MAX   1 = left (as seen from front), FILE_MAX = right
+// Shorthand (l, r, f) = (level, rank, file) is used below wherever a cell's
+// diagonal-set membership is computed.
 
-const RANK_MAX = 8;
 const LEVEL_MAX = 5;
-const SLICE_MAX = 5;
+const RANK_MAX = 8;
+const FILE_MAX = 5;
 
-// A "floor" is a thin outline tracing the full rank x slice perimeter of each
+// A "floor" is a thin outline tracing the full rank x file perimeter of each
 // level — a subtle visual aid for telling the five levels of the cube apart.
 // (A filled full-footprint plane was tried first, but adjacent levels' planes
-// overlapped almost completely on screen since the rank/slice extent is much
+// overlapped almost completely on screen since the rank/file extent is much
 // wider than one level's vertical spacing.)
 const PERIMETER_COLORS = {
   1: "rgba(215,212,140,0.5)",
@@ -39,9 +41,36 @@ const alphaForLevel = (level, focus) => {
 const checkerColor = (level, variant, focus) =>
   `rgba(${CHECKER_BASE[variant]},${alphaForLevel(level, focus)})`;
 
+// Diagonal color lookup table — the only place a diagonal label (diag_a
+// .. diag_d) is tied to an actual color. Change a value here to recolor
+// every cell in that diagonal set; nothing else needs to change.
+const DIAG_BLUE = "#3333cc";
+const DIAG_PURPLE = "#cc33cc";
+const DIAG_ORANGE = "#cc6633";
+const DIAG_GREEN = "#33cc33";
+
+const DIAG_COLORS = {
+  diag_a: DIAG_BLUE,
+  diag_b: DIAG_PURPLE,
+  diag_c: DIAG_ORANGE,
+  diag_d: DIAG_GREEN,
+};
+
+const hexToRgb = (hex) => {
+  const n = parseInt(hex.slice(1), 16);
+  return `${(n >> 16) & 255},${(n >> 8) & 255},${n & 255}`;
+};
+
+// Diagonal squares fade with focus level exactly like the checkerboard does.
+const diagStrokeColor = (diagId, level, focus) =>
+  `rgba(${hexToRgb(DIAG_COLORS[diagId])},${alphaForLevel(level, focus)})`;
+
 const PITCH = 70;         // world-unit distance between adjacent cell coordinates
 const CELL_FRACTION = 1;    // fraction of PITCH each cell's floor occupies (1 = cells abut, no gap)
 const HALF = CELL_FRACTION / 2;
+
+const DIAG_SQUARE_MARGIN = 3;      // px gap between a diag square and the cell's outer edge
+const DIAG_SQUARE_STROKE_WIDTH = 3; // px width of the diag square's outline
 
 const TILT_DEGREES = 20; // isometric tilt angle; try other values freely
 const TILT_RAD = TILT_DEGREES * Math.PI / 180;
@@ -49,11 +78,11 @@ const COS_TILT = Math.cos(TILT_RAD);
 const SIN_TILT = Math.sin(TILT_RAD);
 
 // Per-unit-step screen-space basis vectors, derived from the isometric projection
-// (slice - rank) * cos(tilt), -(rank + slice) * sin(tilt) - level. This puts
-// the rank=max/slice=max corner (back-right) at the top of the view and the
-// rank=max/slice=1 corner (back-left) at the left — i.e. the viewer faces the
+// (file - rank) * cos(tilt), -(rank + file) * sin(tilt) - level. This puts
+// the rank=max/file=max corner (back-right) at the top of the view and the
+// rank=max/file=1 corner (back-left) at the left — i.e. the viewer faces the
 // right-front face of the cube, with the left-rear face away from them.
-const V_SLICE = { x: COS_TILT * PITCH, y: -SIN_TILT * PITCH };
+const V_FILE = { x: COS_TILT * PITCH, y: -SIN_TILT * PITCH };
 const V_RANK = { x: -COS_TILT * PITCH, y: -SIN_TILT * PITCH };
 const V_LEVEL = { x: 0, y: -PITCH };
 
@@ -64,10 +93,10 @@ const scale = (v, s) => {
   return { x: v.x * s, y: v.y * s };
 };
 
-const projectCenter = (rank, level, slice) => {
+const projectCenter = (rank, level, file) => {
   return {
-    x: (slice - rank) * COS_TILT * PITCH,
-    y: -(rank + slice) * SIN_TILT * PITCH - level * PITCH,
+    x: (file - rank) * COS_TILT * PITCH,
+    y: -(rank + file) * SIN_TILT * PITCH - level * PITCH,
   };
 };
 
@@ -79,36 +108,65 @@ const floorPerimeter = (level) => {
   const drop = scale(V_LEVEL, -HALF);
   const rMin = scale(V_RANK, -HALF);
   const rMax = scale(V_RANK, HALF);
-  const sMin = scale(V_SLICE, -HALF);
-  const sMax = scale(V_SLICE, HALF);
+  const fMin = scale(V_FILE, -HALF);
+  const fMax = scale(V_FILE, HALF);
 
-  const frontLeft = add(projectCenter(1, level, 1), rMin, sMin, drop);
-  const frontRight = add(projectCenter(1, level, SLICE_MAX), rMin, sMax, drop);
-  const backRight = add(projectCenter(RANK_MAX, level, SLICE_MAX), rMax, sMax, drop);
-  const backLeft = add(projectCenter(RANK_MAX, level, 1), rMax, sMin, drop);
+  const frontLeft = add(projectCenter(1, level, 1), rMin, fMin, drop);
+  const frontRight = add(projectCenter(1, level, FILE_MAX), rMin, fMax, drop);
+  const backRight = add(projectCenter(RANK_MAX, level, FILE_MAX), rMax, fMax, drop);
+  const backLeft = add(projectCenter(RANK_MAX, level, 1), rMax, fMin, drop);
   return [frontLeft, frontRight, backRight, backLeft];
 };
 
-// The footprint of a single cell's floor, in the same corner order as
-// floorPerimeter (front-left, front-right, back-right, back-left).
-const cellFootprint = (rank, level, slice) => {
+// The floor-plane footprint of a single cell, half-extent `half` (in units
+// of PITCH) out from center along the rank and file axes. Corner order is
+// front-left, front-right, back-right, back-left (matching floorPerimeter).
+const cellFootprintAt = (rank, level, file, half) => {
   const drop = scale(V_LEVEL, -HALF);
-  const rMin = scale(V_RANK, -HALF);
-  const rMax = scale(V_RANK, HALF);
-  const sMin = scale(V_SLICE, -HALF);
-  const sMax = scale(V_SLICE, HALF);
-  const center = projectCenter(rank, level, slice);
+  const rMin = scale(V_RANK, -half);
+  const rMax = scale(V_RANK, half);
+  const fMin = scale(V_FILE, -half);
+  const fMax = scale(V_FILE, half);
+  const center = projectCenter(rank, level, file);
 
   return [
-    add(center, rMin, sMin, drop),
-    add(center, rMin, sMax, drop),
-    add(center, rMax, sMax, drop),
-    add(center, rMax, sMin, drop),
+    add(center, rMin, fMin, drop),
+    add(center, rMin, fMax, drop),
+    add(center, rMax, fMax, drop),
+    add(center, rMax, fMin, drop),
   ];
 };
 
-// Checkerboard parity: a cell is "dark" when rank + level + slice is odd.
-const isDarkCell = (rank, level, slice) => (rank + level + slice) % 2 === 1;
+// The footprint of a single cell's whole floor.
+const cellFootprint = (rank, level, file) => cellFootprintAt(rank, level, file, HALF);
+
+// The footprint of a cell's diag square, inset `marginPx` from the cell's
+// outer edge. V_RANK and V_FILE both have magnitude PITCH, so a screen-space
+// inset of marginPx along either axis is marginPx / PITCH of HALF.
+const cellFootprintInset = (rank, level, file, marginPx) =>
+  cellFootprintAt(rank, level, file, HALF - marginPx / PITCH);
+
+// Checkerboard parity: a cell is "dark" when rank + level + file is odd.
+const isDarkCell = (rank, level, file) => (rank + level + file) % 2 === 1;
+
+// Diagonal membership: every cell (l, r, f) = (level, rank, file) belongs to
+// exactly one of four mutually exclusive sets of 3D-diagonally-adjacent
+// cells, determined by comparing the parity of rank and file against level:
+//
+//   is_odd(R) == is_odd(L)  &&  is_odd(F) == is_odd(L)  ->  diag_a
+//   is_odd(R) == is_odd(L)  &&  is_odd(F) != is_odd(L)  ->  diag_b
+//   is_odd(R) != is_odd(L)  &&  is_odd(F) == is_odd(L)  ->  diag_c
+//   is_odd(R) != is_odd(L)  &&  is_odd(F) != is_odd(L)  ->  diag_d
+const isOdd = (n) => (n % 2) === 1;
+
+const diagForCell = (rank, level, file) => {
+  const rMatchesL = isOdd(rank) === isOdd(level);
+  const fMatchesL = isOdd(file) === isOdd(level);
+  if (rMatchesL && fMatchesL) return "diag_a";
+  if (rMatchesL && !fMatchesL) return "diag_b";
+  if (!rMatchesL && fMatchesL) return "diag_c";
+  return "diag_d";
+};
 
 const SVG_NS = "http://www.w3.org/2000/svg";
 const svgEl = (tag, attrs) => {
@@ -117,14 +175,18 @@ const svgEl = (tag, attrs) => {
   return el;
 };
 
-// Populated by buildScene; used by refreshFocus to recolor checkers in
-// place (no geometry change) when the focus level changes.
+// Populated by buildScene; used by refreshFocus to recolor checkers and diag
+// squares in place (no geometry change) when the focus level changes.
 let checkerPolys = [];
+let diagSquares = [];
 let numeralEl = null;
 
 const refreshFocus = () => {
   for (const { el, level, variant } of checkerPolys) {
     el.setAttribute("fill", checkerColor(level, variant, focusLevel));
+  }
+  for (const { el, level, diagId } of diagSquares) {
+    el.setAttribute("stroke", diagStrokeColor(diagId, level, focusLevel));
   }
   numeralEl.textContent = String(focusLevel);
 };
@@ -220,16 +282,18 @@ const buildFocusWidget = (anchorX, anchorY) => {
 const buildScene = () => {
   const svg = document.getElementById("scene");
   const checkerGroup = svgEl("g", { id: "checkers" });
+  const diagGroup = svgEl("g", { id: "diag-squares" });
   const floorGroup = svgEl("g", { id: "floors" });
   checkerPolys = [];
+  diagSquares = [];
 
   let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
 
   for (let level = 1; level <= LEVEL_MAX; level++) {
     for (let rank = 1; rank <= RANK_MAX; rank++) {
-      for (let slice = 1; slice <= SLICE_MAX; slice++) {
-        const corners = cellFootprint(rank, level, slice);
-        const variant = isDarkCell(rank, level, slice) ? "dark" : "light";
+      for (let file = 1; file <= FILE_MAX; file++) {
+        const corners = cellFootprint(rank, level, file);
+        const variant = isDarkCell(rank, level, file) ? "dark" : "light";
         const poly = svgEl("polygon", {
           points: pointsAttr(corners),
           fill: checkerColor(level, variant, focusLevel),
@@ -241,6 +305,17 @@ const buildScene = () => {
           minX = Math.min(minX, p.x); maxX = Math.max(maxX, p.x);
           minY = Math.min(minY, p.y); maxY = Math.max(maxY, p.y);
         }
+
+        const diagId = diagForCell(rank, level, file);
+        const diagCorners = cellFootprintInset(rank, level, file, DIAG_SQUARE_MARGIN);
+        const diagSquare = svgEl("polygon", {
+          points: pointsAttr(diagCorners),
+          fill: "none",
+          stroke: diagStrokeColor(diagId, level, focusLevel),
+          "stroke-width": DIAG_SQUARE_STROKE_WIDTH,
+        });
+        diagSquares.push({ el: diagSquare, level, diagId });
+        diagGroup.appendChild(diagSquare);
       }
     }
   }
@@ -261,6 +336,7 @@ const buildScene = () => {
   }
 
   svg.appendChild(checkerGroup);
+  svg.appendChild(diagGroup);
   svg.appendChild(floorGroup);
 
   const widget = buildFocusWidget(maxX, maxY);

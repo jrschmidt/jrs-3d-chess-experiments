@@ -1,0 +1,9 @@
+{
+  "name": "run-clc-26-004-driver",
+  "private": true,
+  "type": "module",
+  "description": "Playwright driver for the run-clc-26-004 skill. Not part of the app itself.",
+  "dependencies": {
+    "playwright": "1.62.1"
+  }
+}
