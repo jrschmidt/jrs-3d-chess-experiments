@@ -15,22 +15,16 @@ const FILE_MAX = 5;
 // (A filled full-footprint plane was tried first, but adjacent levels' planes
 // overlapped almost completely on screen since the rank/file extent is much
 // wider than one level's vertical spacing.)
-const PERIMETER_COLOR = "#666666";
+const PERIMETER_COLOR = "#505050";
 
 // Checkerboard base colors (alpha applied separately, see alphaForLevel).
 const CHECKER_BASE = { dark: "51,51,51", light: "204,204,204" };
 
 // The "focus level" is the level the viewer is currently paying attention
-// to; its checkerboard is shown brightest, with level 1 (the floor) always
-// at least dimly visible for orientation, and other levels faint.
+// to; its checkerboard is shown brightest, with every other level faint.
 let focusLevel = 1;
 
-const alphaForLevel = (level, focus) => {
-  if (focus === 1) return level === 1 ? 1.0 : 0.1;
-  if (level === 1) return 0.2;
-  if (level === focus) return 0.5;
-  return 0.1;
-};
+const alphaForLevel = (level, focus) => (level === focus ? 0.5 : 0.1);
 
 const checkerColor = (level, variant, focus) =>
   `rgba(${CHECKER_BASE[variant]},${alphaForLevel(level, focus)})`;
@@ -348,7 +342,7 @@ const buildScene = () => {
       points: pointsAttr(corners),
       fill: "none",
       stroke: PERIMETER_COLOR,
-      "stroke-width": 3,
+      "stroke-width": 5,
       "stroke-linejoin": "round",
     }));
     for (const p of corners) {
