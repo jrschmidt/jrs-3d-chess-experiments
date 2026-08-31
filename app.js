@@ -15,13 +15,7 @@ const FILE_MAX = 5;
 // (A filled full-footprint plane was tried first, but adjacent levels' planes
 // overlapped almost completely on screen since the rank/file extent is much
 // wider than one level's vertical spacing.)
-const PERIMETER_COLORS = {
-  1: "rgba(215,212,140,0.5)",
-  2: "rgba(170,215,140,0.5)",
-  3: "rgba(140,215,159,0.5)",
-  4: "rgba(140,215,205,0.5)",
-  5: "rgba(140,177,215,0.5)",
-};
+const PERIMETER_COLOR = "#666666";
 
 // Checkerboard base colors (alpha applied separately, see alphaForLevel).
 const CHECKER_BASE = { dark: "51,51,51", light: "204,204,204" };
@@ -104,8 +98,12 @@ const pointsAttr = (corners) => {
   return corners.map((c) => `${c.x.toFixed(2)},${c.y.toFixed(2)}`).join(" ");
 };
 
-const floorPerimeter = (level) => {
-  const drop = scale(V_LEVEL, -HALF);
+// The four outer vertical corners of a level, at its floor (dropSign -1) or
+// ceiling (dropSign +1) plane. rank=max/file=max (backRight) is the corner
+// farthest from the viewer, at the rear of the cube — see the basis-vector
+// comment above.
+const perimeterCorners = (level, dropSign) => {
+  const drop = scale(V_LEVEL, dropSign * HALF);
   const rMin = scale(V_RANK, -HALF);
   const rMax = scale(V_RANK, HALF);
   const fMin = scale(V_FILE, -HALF);
@@ -115,7 +113,31 @@ const floorPerimeter = (level) => {
   const frontRight = add(projectCenter(1, level, FILE_MAX), rMin, fMax, drop);
   const backRight = add(projectCenter(RANK_MAX, level, FILE_MAX), rMax, fMax, drop);
   const backLeft = add(projectCenter(RANK_MAX, level, 1), rMax, fMin, drop);
+  return { frontLeft, frontRight, backRight, backLeft };
+};
+
+const floorPerimeter = (level) => {
+  const { frontLeft, frontRight, backRight, backLeft } = perimeterCorners(level, -1);
   return [frontLeft, frontRight, backRight, backLeft];
+};
+
+// The level-LEVEL_MAX ceiling perimeter — the top face of the cube.
+const ceilingPerimeter = () => {
+  const { frontLeft, frontRight, backRight, backLeft } = perimeterCorners(LEVEL_MAX, 1);
+  return [frontLeft, frontRight, backRight, backLeft];
+};
+
+// Vertical edges at all four outer corners, spanning the cube's full height
+// (floor of level 1 to ceiling of LEVEL_MAX).
+const verticalEdges = () => {
+  const bottom = perimeterCorners(1, -1);
+  const top = perimeterCorners(LEVEL_MAX, 1);
+  return [
+    [bottom.frontLeft, top.frontLeft],
+    [bottom.frontRight, top.frontRight],
+    [bottom.backLeft, top.backLeft],
+    [bottom.backRight, top.backRight],
+  ];
 };
 
 // The floor-plane footprint of a single cell, half-extent `half` (in units
@@ -325,8 +347,33 @@ const buildScene = () => {
     floorGroup.appendChild(svgEl("polygon", {
       points: pointsAttr(corners),
       fill: "none",
-      stroke: PERIMETER_COLORS[level],
-      "stroke-width": 5,
+      stroke: PERIMETER_COLOR,
+      "stroke-width": 3,
+      "stroke-linejoin": "round",
+    }));
+    for (const p of corners) {
+      minX = Math.min(minX, p.x); maxX = Math.max(maxX, p.x);
+      minY = Math.min(minY, p.y); maxY = Math.max(maxY, p.y);
+    }
+  }
+
+  for (const [bottom, top] of verticalEdges()) {
+    floorGroup.appendChild(svgEl("line", {
+      x1: bottom.x, y1: bottom.y, x2: top.x, y2: top.y,
+      stroke: PERIMETER_COLOR,
+      "stroke-width": 3,
+    }));
+    minX = Math.min(minX, bottom.x, top.x); maxX = Math.max(maxX, bottom.x, top.x);
+    minY = Math.min(minY, bottom.y, top.y); maxY = Math.max(maxY, bottom.y, top.y);
+  }
+
+  {
+    const corners = ceilingPerimeter();
+    floorGroup.appendChild(svgEl("polygon", {
+      points: pointsAttr(corners),
+      fill: "none",
+      stroke: PERIMETER_COLOR,
+      "stroke-width": 3,
       "stroke-linejoin": "round",
     }));
     for (const p of corners) {
