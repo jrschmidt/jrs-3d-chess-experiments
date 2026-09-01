@@ -16,6 +16,7 @@ const FILE_MAX = 5;
 // overlapped almost completely on screen since the rank/file extent is much
 // wider than one level's vertical spacing.)
 const PERIMETER_COLOR = "#505050";
+const PERIMETER_HIGHLIGHT = "#999999";
 
 // Checkerboard base colors (alpha applied separately, see alphaForLevel).
 const CHECKER_BASE = { dark: "51,51,51", light: "204,204,204" };
@@ -24,7 +25,8 @@ const CHECKER_BASE = { dark: "51,51,51", light: "204,204,204" };
 // to; its checkerboard is shown brightest, with every other level faint.
 let focusLevel = 1;
 
-const alphaForLevel = (level, focus) => (level === focus ? 0.5 : 0.1);
+const alphaForLevel = (level, focus) => (level === focus ? 0.8 : 0.1);
+// const alphaForLevel = (level, focus) => (level === focus ? 0.5 : 0.1);
 
 const checkerColor = (level, variant, focus) =>
   `rgba(${CHECKER_BASE[variant]},${alphaForLevel(level, focus)})`;
@@ -121,6 +123,13 @@ const ceilingPerimeter = () => {
   return [frontLeft, frontRight, backRight, backLeft];
 };
 
+// The 4 named corners of horizontal boundary `i`, where boundaries are
+// indexed 0..LEVEL_MAX from the floor of level 1 to the ceiling of
+// LEVEL_MAX. boundaryCorners(level - 1) is floorPerimeter(level)'s corners;
+// boundaryCorners(LEVEL_MAX) is ceilingPerimeter()'s corners.
+const boundaryCorners = (i) =>
+  i < LEVEL_MAX ? perimeterCorners(i + 1, -1) : perimeterCorners(LEVEL_MAX, 1);
+
 // Vertical edges at all four outer corners, spanning the cube's full height
 // (floor of level 1 to ceiling of LEVEL_MAX).
 const verticalEdges = () => {
@@ -191,10 +200,31 @@ const svgEl = (tag, attrs) => {
   return el;
 };
 
-// Populated by buildScene; used by refreshFocus to recolor checkers and diag
-// squares in place (no geometry change) when the focus level changes.
+// A horizontal boundary is highlighted when it's the floor or ceiling of
+// the focused level (boundary indices focus-1 and focus — see
+// boundaryCorners above).
+const perimeterStroke = (boundaryIndex, focus) =>
+  (boundaryIndex === focus - 1 || boundaryIndex === focus) ? PERIMETER_HIGHLIGHT : PERIMETER_COLOR;
+
+// Repositions the 4 vertical highlight overlays to span the focused level,
+// from its floor boundary up to its ceiling boundary.
+const updateVerticalHighlights = (focus) => {
+  const lower = boundaryCorners(focus - 1);
+  const upper = boundaryCorners(focus);
+  for (const { el, corner } of verticalHighlightEls) {
+    const a = lower[corner], b = upper[corner];
+    el.setAttribute("x1", a.x); el.setAttribute("y1", a.y);
+    el.setAttribute("x2", b.x); el.setAttribute("y2", b.y);
+  }
+};
+
+// Populated by buildScene; used by refreshFocus to recolor checkers, diag
+// squares, and perimeter boundaries in place (no geometry change, except
+// the vertical highlights which reposition) when the focus level changes.
 let checkerPolys = [];
 let diagSquares = [];
+let floorPolys = [];
+let verticalHighlightEls = [];
 let numeralEl = null;
 
 const refreshFocus = () => {
@@ -204,6 +234,10 @@ const refreshFocus = () => {
   for (const { el, level, diagId } of diagSquares) {
     el.setAttribute("stroke", diagStrokeColor(diagId, level, focusLevel));
   }
+  for (const { el, boundaryIndex } of floorPolys) {
+    el.setAttribute("stroke", perimeterStroke(boundaryIndex, focusLevel));
+  }
+  updateVerticalHighlights(focusLevel);
   numeralEl.textContent = String(focusLevel);
 };
 
@@ -302,6 +336,8 @@ const buildScene = () => {
   const floorGroup = svgEl("g", { id: "floors" });
   checkerPolys = [];
   diagSquares = [];
+  floorPolys = [];
+  verticalHighlightEls = [];
 
   let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
 
@@ -338,13 +374,16 @@ const buildScene = () => {
 
   for (let level = 1; level <= LEVEL_MAX; level++) {
     const corners = floorPerimeter(level);
-    floorGroup.appendChild(svgEl("polygon", {
+    const boundaryIndex = level - 1;
+    const poly = svgEl("polygon", {
       points: pointsAttr(corners),
       fill: "none",
-      stroke: PERIMETER_COLOR,
+      stroke: perimeterStroke(boundaryIndex, focusLevel),
       "stroke-width": 5,
       "stroke-linejoin": "round",
-    }));
+    });
+    floorPolys.push({ el: poly, boundaryIndex });
+    floorGroup.appendChild(poly);
     for (const p of corners) {
       minX = Math.min(minX, p.x); maxX = Math.max(maxX, p.x);
       minY = Math.min(minY, p.y); maxY = Math.max(maxY, p.y);
@@ -363,18 +402,30 @@ const buildScene = () => {
 
   {
     const corners = ceilingPerimeter();
-    floorGroup.appendChild(svgEl("polygon", {
+    const boundaryIndex = LEVEL_MAX;
+    const poly = svgEl("polygon", {
       points: pointsAttr(corners),
       fill: "none",
-      stroke: PERIMETER_COLOR,
+      stroke: perimeterStroke(boundaryIndex, focusLevel),
       "stroke-width": 3,
       "stroke-linejoin": "round",
-    }));
+    });
+    floorPolys.push({ el: poly, boundaryIndex });
+    floorGroup.appendChild(poly);
     for (const p of corners) {
       minX = Math.min(minX, p.x); maxX = Math.max(maxX, p.x);
       minY = Math.min(minY, p.y); maxY = Math.max(maxY, p.y);
     }
   }
+
+  // Highlight overlays for the focused level's vertical edge segments,
+  // drawn last so they paint on top of the base vertical lines above.
+  for (const corner of ["frontLeft", "frontRight", "backRight", "backLeft"]) {
+    const el = svgEl("line", { stroke: PERIMETER_HIGHLIGHT, "stroke-width": 3 });
+    verticalHighlightEls.push({ el, corner });
+    floorGroup.appendChild(el);
+  }
+  updateVerticalHighlights(focusLevel);
 
   svg.appendChild(checkerGroup);
   svg.appendChild(diagGroup);
