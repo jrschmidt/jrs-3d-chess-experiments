@@ -79,16 +79,37 @@ try {
   await page.screenshot({ path: path.join(outDir, "screenshot-level2.png") });
   console.log(`screenshot: ${path.join(outDir, "screenshot-level2.png")}`);
 
-  // Sample the diag-square colors actually on screen.
-  const diagColors = await page.$$eval("#diag-squares polygon", (els) => {
+  // The diag-square overlay defaults to off; confirm that, then toggle it on
+  // via the diag-toggle widget's single click target (see buildDiagToggle in
+  // app.js) and confirm squares appear.
+  const sampleDiagColors = () => page.$$eval("#diag-squares polygon", (els) => {
     const set = new Set();
     for (const el of els) {
-      const m = el.getAttribute("stroke")?.match(/rgba\((\d+),(\d+),(\d+)/);
-      if (m) set.add(`${m[1]},${m[2]},${m[3]}`);
+      const stroke = el.getAttribute("stroke");
+      if (stroke) set.add(stroke);
     }
     return [...set];
   });
-  console.log("diag square colors (r,g,b):", diagColors.join(" | "));
+
+  const diagDisplayBefore = await page.locator("#diag-squares").getAttribute("display");
+  console.log(`diag overlay display (before toggle): ${diagDisplayBefore}`);
+  if (diagDisplayBefore !== "none") {
+    console.error("FAIL: diag overlay should default to hidden (display=none)");
+    exitCode = 1;
+  }
+
+  await page.locator('#diag-toggle rect[style*="cursor: pointer"]').click();
+  const diagDisplayAfter = await page.locator("#diag-squares").getAttribute("display");
+  const diagColors = await sampleDiagColors();
+  console.log(`diag overlay display (after toggle): ${diagDisplayAfter}`);
+  console.log("diag square colors (hex):", diagColors.join(" | ") || "(none)");
+  if (diagDisplayAfter !== "inline" || diagColors.length === 0) {
+    console.error("FAIL: clicking the diag toggle did not reveal diag squares");
+    exitCode = 1;
+  }
+
+  await page.screenshot({ path: path.join(outDir, "screenshot-diag-on.png") });
+  console.log(`screenshot: ${path.join(outDir, "screenshot-diag-on.png")}`);
 
   if (consoleErrors.length) {
     console.error("FAIL: console errors:", JSON.stringify(consoleErrors));

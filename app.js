@@ -37,8 +37,8 @@ const CHECKER_COLORS = {
 // to; its checkerboard is shown brightest, with every other level faint.
 let focusLevel = 1;
 
-const alphaForLevel = (level, focus) => (level === focus ? 0.8 : 0.1);
-// const alphaForLevel = (level, focus) => (level === focus ? 0.5 : 0.1);
+// Whether the diagonal-square overlay is shown at all; off by default.
+let diagVisible = false;
 
 const checkerColor = (level, variant, visibility, focus) =>
   CHECKER_COLORS[level === focus ? "focus" : "unfocused"][visibility][variant];
@@ -57,15 +57,6 @@ const DIAG_COLORS = {
   diag_c: DIAG_ORANGE,
   diag_d: DIAG_GREEN,
 };
-
-const hexToRgb = (hex) => {
-  const n = parseInt(hex.slice(1), 16);
-  return `${(n >> 16) & 255},${(n >> 8) & 255},${n & 255}`;
-};
-
-// Diagonal squares fade with focus level exactly like the checkerboard does.
-const diagStrokeColor = (diagId, level, focus) =>
-  `rgba(${hexToRgb(DIAG_COLORS[diagId])},${alphaForLevel(level, focus)})`;
 
 const PITCH = 70;         // world-unit distance between adjacent cell coordinates
 const CELL_FRACTION = 1;    // fraction of PITCH each cell's floor occupies (1 = cells abut, no gap)
@@ -249,17 +240,14 @@ const updateVerticalHighlights = (focus) => {
 // squares, and perimeter boundaries in place (no geometry change, except
 // the vertical highlights which reposition) when the focus level changes.
 let checkerPolys = [];
-let diagSquares = [];
 let floorPolys = [];
 let verticalHighlightEls = [];
 let numeralEl = null;
+let diagGroupEl = null;
 
 const refreshFocus = () => {
   for (const { el, level, variant, visibility } of checkerPolys) {
     el.setAttribute("fill", checkerColor(level, variant, visibility, focusLevel));
-  }
-  for (const { el, level, diagId } of diagSquares) {
-    el.setAttribute("stroke", diagStrokeColor(diagId, level, focusLevel));
   }
   for (const { el, boundaryIndex } of floorPolys) {
     el.setAttribute("stroke", perimeterStroke(boundaryIndex, focusLevel));
@@ -356,14 +344,64 @@ const buildFocusWidget = (anchorX, anchorY) => {
   return { el: g, minX: x0, minY: y0, maxX: x1, maxY: y1 };
 };
 
+// Binary on/off control for the diagonal-square overlay, anchored so its
+// horizontal midpoint sits on anchorX with its top edge at anchorTopY
+// (the caller passes the focus widget's own bottom edge, so it stacks
+// directly beneath it).
+const buildDiagToggle = (anchorX, anchorTopY) => {
+  const W = PITCH * 1.0;
+  const H = PITCH * 0.45;
+  const x0 = anchorX - W / 2;
+  const x1 = anchorX + W / 2;
+  const y0 = anchorTopY;
+  const y1 = anchorTopY + H;
+  const cx = (x0 + x1) / 2;
+  const cy = (y0 + y1) / 2;
+
+  const g = svgEl("g", { id: "diag-toggle" });
+
+  g.appendChild(svgEl("rect", {
+    x: x0, y: y0, width: W, height: H, rx: 6, ry: 6,
+    fill: "rgba(255,255,255,0.05)",
+    stroke: "rgba(255,255,255,0.25)",
+    "stroke-width": 1,
+  }));
+
+  const label = svgEl("text", {
+    x: cx, y: cy,
+    "text-anchor": "middle",
+    "dominant-baseline": "central",
+    "font-size": PITCH * 0.16,
+    "font-family": "system-ui, sans-serif",
+    "letter-spacing": "1.5",
+    fill: "#cdd3de",
+    opacity: 0.7,
+  });
+  label.textContent = diagVisible ? "DIAGONALS: ON" : "DIAGONALS: OFF";
+  g.appendChild(label);
+
+  const hit = svgEl("rect", {
+    x: x0, y: y0, width: W, height: H,
+    fill: "rgba(255,255,255,0.001)",
+    style: "cursor: pointer",
+  });
+  hit.addEventListener("click", () => {
+    diagVisible = !diagVisible;
+    label.textContent = diagVisible ? "DIAGONALS: ON" : "DIAGONALS: OFF";
+    diagGroupEl.setAttribute("display", diagVisible ? "inline" : "none");
+  });
+  g.appendChild(hit);
+
+  return { el: g, minX: x0, minY: y0, maxX: x1, maxY: y1 };
+};
+
 const buildScene = () => {
   const svg = document.getElementById("scene");
   const defs = svgEl("defs", {});
   const checkerGroup = svgEl("g", { id: "checkers" });
-  const diagGroup = svgEl("g", { id: "diag-squares" });
+  diagGroupEl = svgEl("g", { id: "diag-squares", display: diagVisible ? "inline" : "none" });
   const floorGroup = svgEl("g", { id: "floors" });
   checkerPolys = [];
-  diagSquares = [];
   floorPolys = [];
   verticalHighlightEls = [];
 
@@ -421,11 +459,10 @@ const buildScene = () => {
         const diagSquare = svgEl("polygon", {
           points: pointsAttr(diagCorners),
           fill: "none",
-          stroke: diagStrokeColor(diagId, level, focusLevel),
+          stroke: DIAG_COLORS[diagId],
           "stroke-width": DIAG_SQUARE_STROKE_WIDTH,
         });
-        diagSquares.push({ el: diagSquare, level, diagId });
-        diagGroup.appendChild(diagSquare);
+        diagGroupEl.appendChild(diagSquare);
       }
     }
   }
@@ -487,13 +524,19 @@ const buildScene = () => {
 
   svg.appendChild(defs);
   svg.appendChild(checkerGroup);
-  svg.appendChild(diagGroup);
+  svg.appendChild(diagGroupEl);
   svg.appendChild(floorGroup);
 
   const widget = buildFocusWidget(maxX, maxY);
   svg.appendChild(widget.el);
   minX = Math.min(minX, widget.minX); maxX = Math.max(maxX, widget.maxX);
   minY = Math.min(minY, widget.minY); maxY = Math.max(maxY, widget.maxY);
+
+  const diagToggleGap = PITCH * 0.15;
+  const diagToggle = buildDiagToggle(widget.minX + (widget.maxX - widget.minX) / 2, widget.maxY + diagToggleGap);
+  svg.appendChild(diagToggle.el);
+  minX = Math.min(minX, diagToggle.minX); maxX = Math.max(maxX, diagToggle.maxX);
+  minY = Math.min(minY, diagToggle.minY); maxY = Math.max(maxY, diagToggle.maxY);
 
   const pad = PITCH * 0.6;
   const vbX = minX - pad, vbY = minY - pad;
