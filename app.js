@@ -345,49 +345,71 @@ const buildFocusWidget = (anchorX, anchorY) => {
 };
 
 // Binary on/off control for the diagonal-square overlay, anchored so its
-// horizontal midpoint sits on anchorX with its top edge at anchorTopY
-// (the caller passes the focus widget's own bottom edge, so it stacks
-// directly beneath it).
-const buildDiagToggle = (anchorX, anchorTopY) => {
-  const W = PITCH * 1.0;
-  const H = PITCH * 0.45;
-  const x0 = anchorX - W / 2;
-  const x1 = anchorX + W / 2;
-  const y0 = anchorTopY;
-  const y1 = anchorTopY + H;
+// left edge sits at anchorLeftX and its vertical midpoint sits at
+// anchorCenterY (the caller passes the focus widget's right edge and
+// vertical center, so it sits alongside it). A 3-line title sits above the
+// clickable button, which itself just reads "ON"/"OFF".
+const TITLE_LINES = ["SHOW THREE", "DIMENSIONAL", "DIAGONALS"];
+
+const buildDiagToggle = (anchorLeftX, anchorCenterY) => {
+  const W = PITCH * 1.3;
+  const titleFontSize = PITCH * 0.12;
+  const titleLineHeight = titleFontSize * 1.3;
+  const titleH = titleLineHeight * TITLE_LINES.length + PITCH * 0.08;
+  const buttonH = PITCH * 0.45;
+  const H = titleH + buttonH;
+  const x0 = anchorLeftX;
+  const x1 = anchorLeftX + W;
+  const y0 = anchorCenterY - H / 2;
+  const y1 = anchorCenterY + H / 2;
+  const buttonY0 = y0 + titleH;
   const cx = (x0 + x1) / 2;
-  const cy = (y0 + y1) / 2;
+  const buttonCy = (buttonY0 + y1) / 2;
 
   const g = svgEl("g", { id: "diag-toggle" });
 
+  const title = svgEl("text", {
+    x: cx, y: y0 + titleLineHeight * 0.8,
+    "text-anchor": "middle",
+    "font-size": titleFontSize,
+    "font-family": "system-ui, sans-serif",
+    "letter-spacing": "0.5",
+    fill: "#cdd3de",
+    opacity: 0.7,
+  });
+  TITLE_LINES.forEach((line, i) => {
+    const tspan = svgEl("tspan", { x: cx, dy: i === 0 ? 0 : titleLineHeight });
+    tspan.textContent = line;
+    title.appendChild(tspan);
+  });
+  g.appendChild(title);
+
   g.appendChild(svgEl("rect", {
-    x: x0, y: y0, width: W, height: H, rx: 6, ry: 6,
+    x: x0, y: buttonY0, width: W, height: buttonH, rx: 6, ry: 6,
     fill: "rgba(255,255,255,0.05)",
     stroke: "rgba(255,255,255,0.25)",
     "stroke-width": 1,
   }));
 
-  const label = svgEl("text", {
-    x: cx, y: cy,
+  const stateLabel = svgEl("text", {
+    x: cx, y: buttonCy,
     "text-anchor": "middle",
     "dominant-baseline": "central",
-    "font-size": PITCH * 0.16,
+    "font-size": PITCH * 0.22,
     "font-family": "system-ui, sans-serif",
-    "letter-spacing": "1.5",
     fill: "#cdd3de",
-    opacity: 0.7,
   });
-  label.textContent = diagVisible ? "DIAGONALS: ON" : "DIAGONALS: OFF";
-  g.appendChild(label);
+  stateLabel.textContent = diagVisible ? "ON" : "OFF";
+  g.appendChild(stateLabel);
 
   const hit = svgEl("rect", {
-    x: x0, y: y0, width: W, height: H,
+    x: x0, y: buttonY0, width: W, height: buttonH,
     fill: "rgba(255,255,255,0.001)",
     style: "cursor: pointer",
   });
   hit.addEventListener("click", () => {
     diagVisible = !diagVisible;
-    label.textContent = diagVisible ? "DIAGONALS: ON" : "DIAGONALS: OFF";
+    stateLabel.textContent = diagVisible ? "ON" : "OFF";
     diagGroupEl.setAttribute("display", diagVisible ? "inline" : "none");
   });
   g.appendChild(hit);
@@ -532,8 +554,8 @@ const buildScene = () => {
   minX = Math.min(minX, widget.minX); maxX = Math.max(maxX, widget.maxX);
   minY = Math.min(minY, widget.minY); maxY = Math.max(maxY, widget.maxY);
 
-  const diagToggleGap = PITCH * 0.15;
-  const diagToggle = buildDiagToggle(widget.minX + (widget.maxX - widget.minX) / 2, widget.maxY + diagToggleGap);
+  const diagToggleGap = PITCH * 0.2;
+  const diagToggle = buildDiagToggle(widget.maxX + diagToggleGap, (widget.minY + widget.maxY) / 2);
   svg.appendChild(diagToggle.el);
   minX = Math.min(minX, diagToggle.minX); maxX = Math.max(maxX, diagToggle.maxX);
   minY = Math.min(minY, diagToggle.minY); maxY = Math.max(maxY, diagToggle.maxY);
