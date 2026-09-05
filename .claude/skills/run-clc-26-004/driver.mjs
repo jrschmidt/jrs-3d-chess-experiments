@@ -56,7 +56,7 @@ try {
   page.on("pageerror", (err) => consoleErrors.push(String(err)));
 
   await page.goto(BASE_URL);
-  await page.waitForSelector("#scene polygon");
+  await page.waitForSelector("#checkers polygon");
 
   await page.screenshot({ path: path.join(outDir, "screenshot.png") });
   console.log(`screenshot: ${path.join(outDir, "screenshot.png")}`);

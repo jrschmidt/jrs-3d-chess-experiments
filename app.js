@@ -18,8 +18,20 @@ const FILE_MAX = 5;
 const PERIMETER_COLOR = "#505050";
 const PERIMETER_HIGHLIGHT = "#999999";
 
-// Checkerboard base colors (alpha applied separately, see alphaForLevel).
-const CHECKER_BASE = { dark: "51,51,51", light: "204,204,204" };
+// Flat checkerboard colors, chosen along two independent axes: whether the
+// square's level is the focus level, and whether the square (or the part of
+// it in question) is in the visible or hidden portion of that level's floor
+// (see chevronPoints below for what "visible" means).
+const CHECKER_COLORS = {
+  focus: {
+    visible: { light: "#a0a0a0", dark: "#1f1f1f" },
+    hidden: { light: "#808080", dark: "#1f1f1f" },
+  },
+  unfocused: {
+    visible: { light: "#808080", dark: "#1f1f1f" },
+    hidden: { light: "#3f3f3f", dark: "#0f0f0f" },
+  },
+};
 
 // The "focus level" is the level the viewer is currently paying attention
 // to; its checkerboard is shown brightest, with every other level faint.
@@ -28,8 +40,8 @@ let focusLevel = 1;
 const alphaForLevel = (level, focus) => (level === focus ? 0.8 : 0.1);
 // const alphaForLevel = (level, focus) => (level === focus ? 0.5 : 0.1);
 
-const checkerColor = (level, variant, focus) =>
-  `rgba(${CHECKER_BASE[variant]},${alphaForLevel(level, focus)})`;
+const checkerColor = (level, variant, visibility, focus) =>
+  CHECKER_COLORS[level === focus ? "focus" : "unfocused"][visibility][variant];
 
 // Diagonal color lookup table — the only place a diagonal label (diag_a
 // .. diag_d) is tied to an actual color. Change a value here to recolor
@@ -130,6 +142,21 @@ const ceilingPerimeter = () => {
 const boundaryCorners = (i) =>
   i < LEVEL_MAX ? perimeterCorners(i + 1, -1) : perimeterCorners(LEVEL_MAX, 1);
 
+// The visible portion of level L's floor (L = 1..LEVEL_MAX-1; the top level
+// is always fully visible), as a 6-vertex chevron in screen space. Named
+// per the vertical edges A (back-right), B (front-right), C (front-left),
+// D (back-left): [D_L, C_L, B_L, B_(L-1), C_(L-1), D_(L-1)], where the
+// subscript indexes boundaryCorners (0 = floor of level 1, LEVEL_MAX =
+// ceiling of level LEVEL_MAX).
+const chevronPoints = (level) => {
+  const upper = boundaryCorners(level);
+  const lower = boundaryCorners(level - 1);
+  return [
+    upper.backLeft, upper.frontLeft, upper.frontRight,
+    lower.frontRight, lower.frontLeft, lower.backLeft,
+  ];
+};
+
 // Vertical edges at all four outer corners, spanning the cube's full height
 // (floor of level 1 to ceiling of LEVEL_MAX).
 const verticalEdges = () => {
@@ -228,8 +255,8 @@ let verticalHighlightEls = [];
 let numeralEl = null;
 
 const refreshFocus = () => {
-  for (const { el, level, variant } of checkerPolys) {
-    el.setAttribute("fill", checkerColor(level, variant, focusLevel));
+  for (const { el, level, variant, visibility } of checkerPolys) {
+    el.setAttribute("fill", checkerColor(level, variant, visibility, focusLevel));
   }
   for (const { el, level, diagId } of diagSquares) {
     el.setAttribute("stroke", diagStrokeColor(diagId, level, focusLevel));
@@ -331,6 +358,7 @@ const buildFocusWidget = (anchorX, anchorY) => {
 
 const buildScene = () => {
   const svg = document.getElementById("scene");
+  const defs = svgEl("defs", {});
   const checkerGroup = svgEl("g", { id: "checkers" });
   const diagGroup = svgEl("g", { id: "diag-squares" });
   const floorGroup = svgEl("g", { id: "floors" });
@@ -341,18 +369,48 @@ const buildScene = () => {
 
   let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
 
+  // One clipPath per non-top level, masking a cell to just its visible
+  // (chevron-shaped) portion of that level's floor.
+  for (let level = 1; level < LEVEL_MAX; level++) {
+    const clipPath = svgEl("clipPath", { id: `visible-clip-${level}` });
+    clipPath.appendChild(svgEl("polygon", { points: pointsAttr(chevronPoints(level)) }));
+    defs.appendChild(clipPath);
+  }
+
   for (let level = 1; level <= LEVEL_MAX; level++) {
     for (let rank = 1; rank <= RANK_MAX; rank++) {
       for (let file = 1; file <= FILE_MAX; file++) {
         const corners = cellFootprint(rank, level, file);
         const variant = isDarkCell(rank, level, file) ? "dark" : "light";
-        const poly = svgEl("polygon", {
-          points: pointsAttr(corners),
-          fill: checkerColor(level, variant, focusLevel),
-          stroke: "none",
-        });
-        checkerPolys.push({ el: poly, level, variant });
-        checkerGroup.appendChild(poly);
+        const pts = pointsAttr(corners);
+
+        if (level < LEVEL_MAX) {
+          const hiddenPoly = svgEl("polygon", {
+            points: pts,
+            fill: checkerColor(level, variant, "hidden", focusLevel),
+            stroke: "none",
+          });
+          checkerPolys.push({ el: hiddenPoly, level, variant, visibility: "hidden" });
+          checkerGroup.appendChild(hiddenPoly);
+
+          const visiblePoly = svgEl("polygon", {
+            points: pts,
+            fill: checkerColor(level, variant, "visible", focusLevel),
+            stroke: "none",
+            "clip-path": `url(#visible-clip-${level})`,
+          });
+          checkerPolys.push({ el: visiblePoly, level, variant, visibility: "visible" });
+          checkerGroup.appendChild(visiblePoly);
+        } else {
+          const poly = svgEl("polygon", {
+            points: pts,
+            fill: checkerColor(level, variant, "visible", focusLevel),
+            stroke: "none",
+          });
+          checkerPolys.push({ el: poly, level, variant, visibility: "visible" });
+          checkerGroup.appendChild(poly);
+        }
+
         for (const p of corners) {
           minX = Math.min(minX, p.x); maxX = Math.max(maxX, p.x);
           minY = Math.min(minY, p.y); maxY = Math.max(maxY, p.y);
@@ -427,6 +485,7 @@ const buildScene = () => {
   }
   updateVerticalHighlights(focusLevel);
 
+  svg.appendChild(defs);
   svg.appendChild(checkerGroup);
   svg.appendChild(diagGroup);
   svg.appendChild(floorGroup);
