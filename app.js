@@ -18,19 +18,12 @@ const FILE_MAX = 5;
 const PERIMETER_COLOR = "#505050";
 const PERIMETER_HIGHLIGHT = "#999999";
 
-// Flat checkerboard colors, chosen along two independent axes: whether the
-// square's level is the focus level, and whether the square (or the part of
-// it in question) is in the visible or hidden portion of that level's floor
-// (see chevronPoints below for what "visible" means).
+// Flat checkerboard colors, chosen by whether the square's level is the
+// focus level. Only the visible portion of each level's floor (see
+// chevronPoints below) is ever drawn; the hidden portion renders nothing.
 const CHECKER_COLORS = {
-  focus: {
-    visible: { light: "#a0a0a0", dark: "#1f1f1f" },
-    hidden: { light: "#808080", dark: "#1f1f1f" },
-  },
-  unfocused: {
-    visible: { light: "#808080", dark: "#1f1f1f" },
-    hidden: { light: "#3f3f3f", dark: "#0f0f0f" },
-  },
+  focus: { light: "#a0a0a0", dark: "#1f1f1f" },
+  unfocused: { light: "#808080", dark: "#333333" },
 };
 
 // The "focus level" is the level the viewer is currently paying attention
@@ -40,8 +33,8 @@ let focusLevel = 1;
 // Whether the diagonal-square overlay is shown at all; off by default.
 let diagVisible = false;
 
-const checkerColor = (level, variant, visibility, focus) =>
-  CHECKER_COLORS[level === focus ? "focus" : "unfocused"][visibility][variant];
+const checkerColor = (level, variant, focus) =>
+  CHECKER_COLORS[level === focus ? "focus" : "unfocused"][variant];
 
 // Diagonal color lookup table — the only place a diagonal label (diag_a
 // .. diag_d) is tied to an actual color. Change a value here to recolor
@@ -148,8 +141,10 @@ const chevronPoints = (level) => {
   ];
 };
 
-// Vertical edges at all four outer corners, spanning the cube's full height
-// (floor of level 1 to ceiling of LEVEL_MAX).
+// Vertical edges at 3 of the 4 outer corners, spanning the cube's full
+// height (floor of level 1 to ceiling of LEVEL_MAX). The 4th corner,
+// backRight, is where the two always-hidden faces (back, right) meet — see
+// chevronPoints — so it's omitted entirely rather than drawn hidden.
 const verticalEdges = () => {
   const bottom = perimeterCorners(1, -1);
   const top = perimeterCorners(LEVEL_MAX, 1);
@@ -157,7 +152,6 @@ const verticalEdges = () => {
     [bottom.frontLeft, top.frontLeft],
     [bottom.frontRight, top.frontRight],
     [bottom.backLeft, top.backLeft],
-    [bottom.backRight, top.backRight],
   ];
 };
 
@@ -246,8 +240,8 @@ let numeralEl = null;
 let diagGroupEl = null;
 
 const refreshFocus = () => {
-  for (const { el, level, variant, visibility } of checkerPolys) {
-    el.setAttribute("fill", checkerColor(level, variant, visibility, focusLevel));
+  for (const { el, level, variant } of checkerPolys) {
+    el.setAttribute("fill", checkerColor(level, variant, focusLevel));
   }
   for (const { el, boundaryIndex } of floorPolys) {
     el.setAttribute("stroke", perimeterStroke(boundaryIndex, focusLevel));
@@ -445,29 +439,21 @@ const buildScene = () => {
         const pts = pointsAttr(corners);
 
         if (level < LEVEL_MAX) {
-          const hiddenPoly = svgEl("polygon", {
-            points: pts,
-            fill: checkerColor(level, variant, "hidden", focusLevel),
-            stroke: "none",
-          });
-          checkerPolys.push({ el: hiddenPoly, level, variant, visibility: "hidden" });
-          checkerGroup.appendChild(hiddenPoly);
-
           const visiblePoly = svgEl("polygon", {
             points: pts,
-            fill: checkerColor(level, variant, "visible", focusLevel),
+            fill: checkerColor(level, variant, focusLevel),
             stroke: "none",
             "clip-path": `url(#visible-clip-${level})`,
           });
-          checkerPolys.push({ el: visiblePoly, level, variant, visibility: "visible" });
+          checkerPolys.push({ el: visiblePoly, level, variant });
           checkerGroup.appendChild(visiblePoly);
         } else {
           const poly = svgEl("polygon", {
             points: pts,
-            fill: checkerColor(level, variant, "visible", focusLevel),
+            fill: checkerColor(level, variant, focusLevel),
             stroke: "none",
           });
-          checkerPolys.push({ el: poly, level, variant, visibility: "visible" });
+          checkerPolys.push({ el: poly, level, variant });
           checkerGroup.appendChild(poly);
         }
 
@@ -492,8 +478,12 @@ const buildScene = () => {
   for (let level = 1; level <= LEVEL_MAX; level++) {
     const corners = floorPerimeter(level);
     const boundaryIndex = level - 1;
-    const poly = svgEl("polygon", {
-      points: pointsAttr(corners),
+    // Only the visible D-C-B path (left edge + front edge) is drawn; the
+    // hidden back/right edges (A-D, B-A) are omitted entirely. A <polyline>
+    // (not <polygon>) is required here so it doesn't auto-close back from
+    // frontRight to backLeft.
+    const poly = svgEl("polyline", {
+      points: pointsAttr([corners[3], corners[0], corners[1]]),
       fill: "none",
       stroke: perimeterStroke(boundaryIndex, focusLevel),
       "stroke-width": 5,
@@ -508,6 +498,21 @@ const buildScene = () => {
   }
 
   for (const [bottom, top] of verticalEdges()) {
+    floorGroup.appendChild(svgEl("line", {
+      x1: bottom.x, y1: bottom.y, x2: top.x, y2: top.y,
+      stroke: PERIMETER_COLOR,
+      "stroke-width": 3,
+    }));
+    minX = Math.min(minX, bottom.x, top.x); maxX = Math.max(maxX, bottom.x, top.x);
+    minY = Math.min(minY, bottom.y, top.y); maxY = Math.max(maxY, bottom.y, top.y);
+  }
+
+  // The back-right corner (A) is otherwise fully hidden — see verticalEdges
+  // above — but its Level-5 segment bounds the always-visible ceiling face,
+  // so just that top-level span is drawn on its own.
+  {
+    const bottom = boundaryCorners(LEVEL_MAX - 1).backRight;
+    const top = boundaryCorners(LEVEL_MAX).backRight;
     floorGroup.appendChild(svgEl("line", {
       x1: bottom.x, y1: bottom.y, x2: top.x, y2: top.y,
       stroke: PERIMETER_COLOR,
@@ -537,7 +542,7 @@ const buildScene = () => {
 
   // Highlight overlays for the focused level's vertical edge segments,
   // drawn last so they paint on top of the base vertical lines above.
-  for (const corner of ["frontLeft", "frontRight", "backRight", "backLeft"]) {
+  for (const corner of ["frontLeft", "frontRight", "backLeft"]) {
     const el = svgEl("line", { stroke: PERIMETER_HIGHLIGHT, "stroke-width": 3 });
     verticalHighlightEls.push({ el, corner });
     floorGroup.appendChild(el);
