@@ -39,10 +39,19 @@ const checkerColor = (level, variant, focus) =>
 // Diagonal color lookup table — the only place a diagonal label (diag_a
 // .. diag_d) is tied to an actual color. Change a value here to recolor
 // every cell in that diagonal set; nothing else needs to change.
-const DIAG_BLUE = "#3333cc";
-const DIAG_PURPLE = "#cc33cc";
-const DIAG_ORANGE = "#cc6633";
-const DIAG_GREEN = "#33cc33";
+//
+// The four values are matched for perceived brightness (OKLab lightness
+// L ~ 0.53-0.55, perceived-luminance ~74-92 on a 0-255 scale) rather than
+// for equal hex saturation — human vision reads green as much brighter
+// than blue at the same saturation, so matching hex patterns (as the
+// original #3333cc/#cc33cc/#cc6633/#33cc33 did) left green looking like
+// it "popped" out of the set. To adjust brightness later, shift all four
+// L values by the same amount rather than editing one hex in isolation,
+// or the imbalance comes back.
+const DIAG_BLUE = "#1953ff";
+const DIAG_PURPLE = "#b300b3";
+const DIAG_ORANGE = "#b34100";
+const DIAG_GREEN = "#178217";
 
 const DIAG_COLORS = {
   diag_a: DIAG_BLUE,
@@ -464,12 +473,14 @@ const buildScene = () => {
 
         const diagId = diagForCell(rank, level, file);
         const diagCorners = cellFootprintInset(rank, level, file, DIAG_SQUARE_MARGIN);
-        const diagSquare = svgEl("polygon", {
+        const diagAttrs = {
           points: pointsAttr(diagCorners),
           fill: "none",
           stroke: DIAG_COLORS[diagId],
           "stroke-width": DIAG_SQUARE_STROKE_WIDTH,
-        });
+        };
+        if (level < LEVEL_MAX) diagAttrs["clip-path"] = `url(#visible-clip-${level})`;
+        const diagSquare = svgEl("polygon", diagAttrs);
         diagGroupEl.appendChild(diagSquare);
       }
     }
