@@ -214,11 +214,26 @@ const diagForCell = (rank, level, file) => {
   return "diag_d";
 };
 
+// Placeholder visibility rule — subject to change.
+const isVisibleCell = (l, r, f) => l === 5 || r === 1 || f === 1;
+
 const SVG_NS = "http://www.w3.org/2000/svg";
 const svgEl = (tag, attrs) => {
   const el = document.createElementNS(SVG_NS, tag);
   for (const [k, v] of Object.entries(attrs)) el.setAttribute(k, v);
   return el;
+};
+
+// --- Bounding-box helpers ---
+const extendBounds = (b, points) => {
+  for (const p of points) {
+    b.minX = Math.min(b.minX, p.x); b.maxX = Math.max(b.maxX, p.x);
+    b.minY = Math.min(b.minY, p.y); b.maxY = Math.max(b.maxY, p.y);
+  }
+};
+const mergeBounds = (b, other) => {
+  b.minX = Math.min(b.minX, other.minX); b.maxX = Math.max(b.maxX, other.maxX);
+  b.minY = Math.min(b.minY, other.minY); b.maxY = Math.max(b.maxY, other.maxY);
 };
 
 // A horizontal boundary is highlighted when it's the floor or ceiling of
@@ -259,6 +274,27 @@ const refreshFocus = () => {
   numeralEl.textContent = String(focusLevel);
 };
 
+// --- Widget chrome helpers (shared by buildFocusWidget/buildDiagToggle) ---
+const TEXT_STYLE = { "font-family": "system-ui, sans-serif", fill: "#cdd3de" };
+
+const makePanelRect = (x0, y0, w, h) =>
+  svgEl("rect", {
+    x: x0, y: y0, width: w, height: h, rx: 6, ry: 6,
+    fill: "rgba(255,255,255,0.05)",
+    stroke: "rgba(255,255,255,0.25)",
+    "stroke-width": 1,
+  });
+
+const makeHitRect = (x0, y0, w, h, onClick) => {
+  const hit = svgEl("rect", {
+    x: x0, y: y0, width: w, height: h,
+    fill: "rgba(255,255,255,0.001)",
+    style: "cursor: pointer",
+  });
+  hit.addEventListener("click", onClick);
+  return hit;
+};
+
 // Small widget for choosing the focus level: a numeral, an up/down arrow
 // pair, and a "LEVEL" label, anchored so its horizontal midpoint sits on
 // (anchorX, anchorY) — the caller passes the cube's own bottom-right corner
@@ -274,21 +310,15 @@ const buildFocusWidget = (anchorX, anchorY) => {
 
   const g = svgEl("g", { id: "focus-widget" });
 
-  g.appendChild(svgEl("rect", {
-    x: x0, y: y0, width: W, height: H, rx: 6, ry: 6,
-    fill: "rgba(255,255,255,0.05)",
-    stroke: "rgba(255,255,255,0.25)",
-    "stroke-width": 1,
-  }));
+  g.appendChild(makePanelRect(x0, y0, W, H));
 
   const labelH = H * 0.22;
   const label = svgEl("text", {
     x: cx, y: y0 + labelH * 0.65,
     "text-anchor": "middle",
     "font-size": PITCH * 0.16,
-    "font-family": "system-ui, sans-serif",
+    ...TEXT_STYLE,
     "letter-spacing": "1.5",
-    fill: "#cdd3de",
     opacity: 0.7,
   });
   label.textContent = "LEVEL";
@@ -305,8 +335,7 @@ const buildFocusWidget = (anchorX, anchorY) => {
     "text-anchor": "middle",
     "dominant-baseline": "central",
     "font-size": PITCH * 0.55,
-    "font-family": "system-ui, sans-serif",
-    fill: "#cdd3de",
+    ...TEXT_STYLE,
   });
   numeralEl.textContent = String(focusLevel);
   g.appendChild(numeralEl);
@@ -317,13 +346,7 @@ const buildFocusWidget = (anchorX, anchorY) => {
   const halfW = (x1 - buttonColX0) / 2 - margin;
 
   const makeButton = (yTop, yBottom, pointing, onClick) => {
-    const hit = svgEl("rect", {
-      x: buttonColX0, y: yTop, width: x1 - buttonColX0, height: yBottom - yTop,
-      fill: "rgba(255,255,255,0.001)",
-      style: "cursor: pointer",
-    });
-    hit.addEventListener("click", onClick);
-    g.appendChild(hit);
+    g.appendChild(makeHitRect(buttonColX0, yTop, x1 - buttonColX0, yBottom - yTop, onClick));
 
     const triTop = yTop + margin;
     const triBottom = yBottom - margin;
@@ -375,9 +398,8 @@ const buildDiagToggle = (anchorLeftX, anchorCenterY) => {
     x: cx, y: y0 + titleLineHeight * 0.8,
     "text-anchor": "middle",
     "font-size": titleFontSize,
-    "font-family": "system-ui, sans-serif",
+    ...TEXT_STYLE,
     "letter-spacing": "0.5",
-    fill: "#cdd3de",
     opacity: 0.7,
   });
   TITLE_LINES.forEach((line, i) => {
@@ -387,37 +409,39 @@ const buildDiagToggle = (anchorLeftX, anchorCenterY) => {
   });
   g.appendChild(title);
 
-  g.appendChild(svgEl("rect", {
-    x: x0, y: buttonY0, width: W, height: buttonH, rx: 6, ry: 6,
-    fill: "rgba(255,255,255,0.05)",
-    stroke: "rgba(255,255,255,0.25)",
-    "stroke-width": 1,
-  }));
+  g.appendChild(makePanelRect(x0, buttonY0, W, buttonH));
 
   const stateLabel = svgEl("text", {
     x: cx, y: buttonCy,
     "text-anchor": "middle",
     "dominant-baseline": "central",
     "font-size": PITCH * 0.22,
-    "font-family": "system-ui, sans-serif",
-    fill: "#cdd3de",
+    ...TEXT_STYLE,
   });
   stateLabel.textContent = diagVisible ? "ON" : "OFF";
   g.appendChild(stateLabel);
 
-  const hit = svgEl("rect", {
-    x: x0, y: buttonY0, width: W, height: buttonH,
-    fill: "rgba(255,255,255,0.001)",
-    style: "cursor: pointer",
-  });
-  hit.addEventListener("click", () => {
+  g.appendChild(makeHitRect(x0, buttonY0, W, buttonH, () => {
     diagVisible = !diagVisible;
     stateLabel.textContent = diagVisible ? "ON" : "OFF";
     diagGroupEl.setAttribute("display", diagVisible ? "inline" : "none");
-  });
-  g.appendChild(hit);
+  }));
 
   return { el: g, minX: x0, minY: y0, maxX: x1, maxY: y1 };
+};
+
+// Attrs for a cell polygon at `level`: a clip-path masking it to its
+// visible chevron portion, or none for the always-fully-visible top level.
+const clipAttrsForLevel = (level) =>
+  level < LEVEL_MAX ? { "clip-path": `url(#visible-clip-${level})` } : {};
+
+const addEdgeLine = (group, bottom, top, bbox) => {
+  group.appendChild(svgEl("line", {
+    x1: bottom.x, y1: bottom.y, x2: top.x, y2: top.y,
+    stroke: PERIMETER_COLOR,
+    "stroke-width": 3,
+  }));
+  extendBounds(bbox, [bottom, top]);
 };
 
 const buildScene = () => {
@@ -430,7 +454,7 @@ const buildScene = () => {
   floorPolys = [];
   verticalHighlightEls = [];
 
-  let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+  const bbox = { minX: Infinity, minY: Infinity, maxX: -Infinity, maxY: -Infinity };
 
   // One clipPath per non-top level, masking a cell to just its visible
   // (chevron-shaped) portion of that level's floor.
@@ -447,40 +471,26 @@ const buildScene = () => {
         const variant = isDarkCell(rank, level, file) ? "dark" : "light";
         const pts = pointsAttr(corners);
 
-        if (level < LEVEL_MAX) {
-          const visiblePoly = svgEl("polygon", {
-            points: pts,
-            fill: checkerColor(level, variant, focusLevel),
-            stroke: "none",
-            "clip-path": `url(#visible-clip-${level})`,
-          });
-          checkerPolys.push({ el: visiblePoly, level, variant });
-          checkerGroup.appendChild(visiblePoly);
-        } else {
-          const poly = svgEl("polygon", {
-            points: pts,
-            fill: checkerColor(level, variant, focusLevel),
-            stroke: "none",
-          });
-          checkerPolys.push({ el: poly, level, variant });
-          checkerGroup.appendChild(poly);
-        }
+        const poly = svgEl("polygon", {
+          points: pts,
+          fill: checkerColor(level, variant, focusLevel),
+          stroke: "none",
+          ...clipAttrsForLevel(level),
+        });
+        checkerPolys.push({ el: poly, level, variant });
+        checkerGroup.appendChild(poly);
 
-        for (const p of corners) {
-          minX = Math.min(minX, p.x); maxX = Math.max(maxX, p.x);
-          minY = Math.min(minY, p.y); maxY = Math.max(maxY, p.y);
-        }
+        extendBounds(bbox, corners);
 
         const diagId = diagForCell(rank, level, file);
         const diagCorners = cellFootprintInset(rank, level, file, DIAG_SQUARE_MARGIN);
-        const diagAttrs = {
+        const diagSquare = svgEl("polygon", {
           points: pointsAttr(diagCorners),
           fill: "none",
           stroke: DIAG_COLORS[diagId],
           "stroke-width": DIAG_SQUARE_STROKE_WIDTH,
-        };
-        if (level < LEVEL_MAX) diagAttrs["clip-path"] = `url(#visible-clip-${level})`;
-        const diagSquare = svgEl("polygon", diagAttrs);
+          ...clipAttrsForLevel(level),
+        });
         diagGroupEl.appendChild(diagSquare);
       }
     }
@@ -502,20 +512,11 @@ const buildScene = () => {
     });
     floorPolys.push({ el: poly, boundaryIndex });
     floorGroup.appendChild(poly);
-    for (const p of corners) {
-      minX = Math.min(minX, p.x); maxX = Math.max(maxX, p.x);
-      minY = Math.min(minY, p.y); maxY = Math.max(maxY, p.y);
-    }
+    extendBounds(bbox, corners);
   }
 
   for (const [bottom, top] of verticalEdges()) {
-    floorGroup.appendChild(svgEl("line", {
-      x1: bottom.x, y1: bottom.y, x2: top.x, y2: top.y,
-      stroke: PERIMETER_COLOR,
-      "stroke-width": 3,
-    }));
-    minX = Math.min(minX, bottom.x, top.x); maxX = Math.max(maxX, bottom.x, top.x);
-    minY = Math.min(minY, bottom.y, top.y); maxY = Math.max(maxY, bottom.y, top.y);
+    addEdgeLine(floorGroup, bottom, top, bbox);
   }
 
   // The back-right corner (A) is otherwise fully hidden — see verticalEdges
@@ -524,13 +525,7 @@ const buildScene = () => {
   {
     const bottom = boundaryCorners(LEVEL_MAX - 1).backRight;
     const top = boundaryCorners(LEVEL_MAX).backRight;
-    floorGroup.appendChild(svgEl("line", {
-      x1: bottom.x, y1: bottom.y, x2: top.x, y2: top.y,
-      stroke: PERIMETER_COLOR,
-      "stroke-width": 3,
-    }));
-    minX = Math.min(minX, bottom.x, top.x); maxX = Math.max(maxX, bottom.x, top.x);
-    minY = Math.min(minY, bottom.y, top.y); maxY = Math.max(maxY, bottom.y, top.y);
+    addEdgeLine(floorGroup, bottom, top, bbox);
   }
 
   {
@@ -545,10 +540,7 @@ const buildScene = () => {
     });
     floorPolys.push({ el: poly, boundaryIndex });
     floorGroup.appendChild(poly);
-    for (const p of corners) {
-      minX = Math.min(minX, p.x); maxX = Math.max(maxX, p.x);
-      minY = Math.min(minY, p.y); maxY = Math.max(maxY, p.y);
-    }
+    extendBounds(bbox, corners);
   }
 
   // Highlight overlays for the focused level's vertical edge segments,
@@ -565,20 +557,18 @@ const buildScene = () => {
   svg.appendChild(diagGroupEl);
   svg.appendChild(floorGroup);
 
-  const widget = buildFocusWidget(maxX, maxY);
+  const widget = buildFocusWidget(bbox.maxX, bbox.maxY);
   svg.appendChild(widget.el);
-  minX = Math.min(minX, widget.minX); maxX = Math.max(maxX, widget.maxX);
-  minY = Math.min(minY, widget.minY); maxY = Math.max(maxY, widget.maxY);
+  mergeBounds(bbox, widget);
 
   const diagToggleGap = PITCH * 0.2;
   const diagToggle = buildDiagToggle(widget.maxX + diagToggleGap, (widget.minY + widget.maxY) / 2);
   svg.appendChild(diagToggle.el);
-  minX = Math.min(minX, diagToggle.minX); maxX = Math.max(maxX, diagToggle.maxX);
-  minY = Math.min(minY, diagToggle.minY); maxY = Math.max(maxY, diagToggle.maxY);
+  mergeBounds(bbox, diagToggle);
 
   const pad = PITCH * 0.6;
-  const vbX = minX - pad, vbY = minY - pad;
-  const vbW = (maxX - minX) + pad * 2, vbH = (maxY - minY) + pad * 2;
+  const vbX = bbox.minX - pad, vbY = bbox.minY - pad;
+  const vbW = (bbox.maxX - bbox.minX) + pad * 2, vbH = (bbox.maxY - bbox.minY) + pad * 2;
   svg.setAttribute("viewBox", `${vbX} ${vbY} ${vbW} ${vbH}`);
   svg.setAttribute("preserveAspectRatio", "xMidYMid meet");
 };
