@@ -213,14 +213,14 @@ const rhombusCorners = (half) => {
 
 // A solid red rhombus, sized to half the width and height of a cell's
 // footprint (see rhombusCorners), for exercising placeIcon.
-const TEST_ICON = `<polygon points="${pointsAttr(rhombusCorners(ICON_HALF))}" fill="#ff0000" />`;
+const X_ICON_0 = `<polygon points="${pointsAttr(rhombusCorners(ICON_HALF))}" fill="#ff0000" />`;
 
-// Same shape as TEST_ICON, but with literal corner coordinates instead of
+// Same shape as X_ICON_0, but with literal corner coordinates instead of
 // a computed pointsAttr(rhombusCorners(...)) call.
 const X_ICON_1 = `<polygon points="0.00,11.97 32.89,0.00 0.00,-11.97 -32.89,0.00" fill="#00ff00" />`;
 const X_ICON_2 = `<polygon points="0.00,12 32,0.00 0.00,-12 -32,0.00" fill="#0000ff" />`;
 
-// Same shape as TEST_ICON/X_ICON_1, but built with <symbol>/<use> instead
+// Same shape as X_ICON_0/X_ICON_1, but built with <symbol>/<use> instead
 // of a bare <polygon>: the symbol defines the rhombus in its own viewBox
 // coordinate space, and <use> instances it at that same size/offset (so the
 // mapping from symbol viewBox to use's x/y/width/height is 1:1, and the
@@ -251,7 +251,34 @@ const X_ICON_6 = `
   </g>
 `;
 
-// Parses a snippet of SVG markup (e.g. TEST_ICON) into a detached element
+const X_ICON_7 = `
+  <g>
+    <symbol id="x-icon-7" viewBox="-16 -16 31 31">
+      <rect x="-16" y="-16" width="31" height="31" fill="#000000" />
+    </symbol>
+    <use href="#x-icon-7" x="-16" y="-16" width="31" height="31" />
+  </g>
+`;
+
+// Same box-fitting approach as X_ICON_7, but a white circle (with a black
+// outline) instead of the black square — radius is the midpoint between
+// the circle inscribed in a 31-side square (r=15.5) and the one
+// circumscribed around it (r=15.5*sqrt(2)~=21.92), i.e. ~18.71. Centered at
+// the origin (unlike X_ICON_7's square, which is centered at (-0.5,-0.5))
+// so it lands exactly on the cell footprint's center, per placeIcon's
+// single-translate convention. viewBox/use box is grown to fit the circle
+// plus its 2px outline so nothing gets clipped (same issue X_ICON_7 hit
+// with its square).
+const X_ICON_8 = `
+  <g>
+    <symbol id="x-icon-8" viewBox="-19.71 -19.71 39.42 39.42">
+      <circle cx="0" cy="0" r="18.71" fill="#ffffff" stroke="#000000" stroke-width="2" />
+    </symbol>
+    <use href="#x-icon-8" x="-19.71" y="-19.71" width="39.42" height="39.42" />
+  </g>
+`;
+
+// Parses a snippet of SVG markup (e.g. X_ICON_0) into a detached element
 // that can be appended into the scene.
 const parseSvgFragment = (markup) => {
   const doc = new DOMParser().parseFromString(
@@ -261,7 +288,7 @@ const parseSvgFragment = (markup) => {
   return doc.documentElement.firstElementChild;
 };
 
-// Draws `svg` (a string of SVG markup, e.g. TEST_ICON) centered on cell
+// Draws `svg` (a string of SVG markup, e.g. X_ICON_0) centered on cell
 // (l, r, f)'s floor footprint.
 const placeIcon = (svg, l, r, f) => {
   const sceneEl = document.getElementById("scene");
@@ -655,9 +682,13 @@ const buildScene = () => {
 
 buildScene();
 
-placeIcon(TEST_ICON, 5, 4, 3);
-placeIcon(TEST_ICON, 5, 6, 4);
+placeIcon(X_ICON_0, 5, 4, 3);
+placeIcon(X_ICON_0, 5, 6, 4);
 placeIcon(X_ICON_1, 5, 3, 5);
 placeIcon(X_ICON_2, 5, 2, 5);
 placeIcon(X_ICON_4, 5, 8, 5);
 placeIcon(X_ICON_6, 5, 8, 3);
+placeIcon(X_ICON_7, 5, 5, 1);
+placeIcon(X_ICON_7, 5, 6, 3);
+placeIcon(X_ICON_8, 5, 5, 5);
+placeIcon(X_ICON_8, 5, 6, 5);
