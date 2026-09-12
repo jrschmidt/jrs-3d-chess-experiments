@@ -63,6 +63,7 @@ const DIAG_COLORS = {
 const PITCH = 70;         // world-unit distance between adjacent cell coordinates
 const CELL_FRACTION = 1;    // fraction of PITCH each cell's floor occupies (1 = cells abut, no gap)
 const HALF = CELL_FRACTION / 2;
+const ICON_HALF = HALF / 2;    // half-cell scale (half width/height of the cell footprint) used for icons
 
 const DIAG_SQUARE_MARGIN = 3;      // px gap between a diag square and the cell's outer edge
 const DIAG_SQUARE_STROKE_WIDTH = 3; // px width of the diag square's outline
@@ -191,6 +192,85 @@ const cellFootprint = (rank, level, file) => cellFootprintAt(rank, level, file, 
 // inset of marginPx along either axis is marginPx / PITCH of HALF.
 const cellFootprintInset = (rank, level, file, marginPx) =>
   cellFootprintAt(rank, level, file, HALF - marginPx / PITCH);
+
+// Corners of a rhombus with half-extent `half` along the rank/file axes,
+// centered at the origin (unpositioned) — the building block for icon
+// shapes that placeIcon then translates onto a specific cell.
+const rhombusCorners = (half) => {
+  const rMin = scale(V_RANK, -half);
+  const rMax = scale(V_RANK, half);
+  const fMin = scale(V_FILE, -half);
+  const fMax = scale(V_FILE, half);
+  return [
+    add(rMin, fMin),
+    add(rMin, fMax),
+    add(rMax, fMax),
+    add(rMax, fMin),
+  ];
+};
+
+
+
+// A solid red rhombus, sized to half the width and height of a cell's
+// footprint (see rhombusCorners), for exercising placeIcon.
+const TEST_ICON = `<polygon points="${pointsAttr(rhombusCorners(ICON_HALF))}" fill="#ff0000" />`;
+
+// Same shape as TEST_ICON, but with literal corner coordinates instead of
+// a computed pointsAttr(rhombusCorners(...)) call.
+const X_ICON_1 = `<polygon points="0.00,11.97 32.89,0.00 0.00,-11.97 -32.89,0.00" fill="#00ff00" />`;
+const X_ICON_2 = `<polygon points="0.00,12 32,0.00 0.00,-12 -32,0.00" fill="#0000ff" />`;
+
+// Same shape as TEST_ICON/X_ICON_1, but built with <symbol>/<use> instead
+// of a bare <polygon>: the symbol defines the rhombus in its own viewBox
+// coordinate space, and <use> instances it at that same size/offset (so the
+// mapping from symbol viewBox to use's x/y/width/height is 1:1, and the
+// rhombus ends up centered at the origin exactly as the other icons are).
+// Wrapped in a single <g> since parseSvgFragment appends only the fragment's
+// first element child.
+
+const X_ICON_4 = `
+  <g>
+    <symbol id="x-icon-4" viewBox="-33 -12 66 24">
+      <polygon points="0,12 32,0 0,-12 -32,0" fill="#ff8800" />
+    </symbol>
+    <use href="#x-icon-4" x="-33" y="-12" width="66" height="24" />
+  </g>
+`;
+
+// Same rhombus as X_ICON_4, plus a black square centered on the rhombus's
+// center with each corner on one of the rhombus's edges (x/32 + y/12 = 1
+// solved for the square's corner (s,s) gives s = 96/11 ≈ 8.73 — the square
+// requirement, unlike an arbitrary rectangle, fully determines this size).
+const X_ICON_6 = `
+  <g>
+    <symbol id="x-icon-6" viewBox="-33 -12 66 24">
+      <polygon points="0,12 32,0 0,-12 -32,0" fill="#ff8800" />
+      <rect x="-8.73" y="-8.73" width="17.46" height="17.46" fill="#000000" />
+    </symbol>
+    <use href="#x-icon-6" x="-33" y="-12" width="66" height="24" />
+  </g>
+`;
+
+// Parses a snippet of SVG markup (e.g. TEST_ICON) into a detached element
+// that can be appended into the scene.
+const parseSvgFragment = (markup) => {
+  const doc = new DOMParser().parseFromString(
+    `<svg xmlns="${SVG_NS}">${markup}</svg>`,
+    "image/svg+xml"
+  );
+  return doc.documentElement.firstElementChild;
+};
+
+// Draws `svg` (a string of SVG markup, e.g. TEST_ICON) centered on cell
+// (l, r, f)'s floor footprint.
+const placeIcon = (svg, l, r, f) => {
+  const sceneEl = document.getElementById("scene");
+  const center = add(projectCenter(r, l, f), scale(V_LEVEL, -HALF));
+  const g = svgEl("g", { transform: `translate(${center.x.toFixed(2)}, ${center.y.toFixed(2)})` });
+  g.appendChild(parseSvgFragment(svg));
+  sceneEl.appendChild(g);
+  return g;
+};
 
 // Checkerboard parity: a cell is "dark" when rank + level + file is odd.
 const isDarkCell = (rank, level, file) => (rank + level + file) % 2 === 1;
@@ -574,3 +654,10 @@ const buildScene = () => {
 };
 
 buildScene();
+
+placeIcon(TEST_ICON, 5, 4, 3);
+placeIcon(TEST_ICON, 5, 6, 4);
+placeIcon(X_ICON_1, 5, 3, 5);
+placeIcon(X_ICON_2, 5, 2, 5);
+placeIcon(X_ICON_4, 5, 8, 5);
+placeIcon(X_ICON_6, 5, 8, 3);
