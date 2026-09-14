@@ -278,6 +278,39 @@ const X_ICON_8 = `
   </g>
 `;
 
+// X_ICON_8's circle, plus an arbitrary polygon overlay drawn on top via a
+// second, nested <symbol>/<use> pair — same viewBox-mapping trick used
+// throughout X_ICON_3-X_ICON_8, but with viewBox="0 0 100 100" so a polygon
+// can be authored directly in 0-100 coordinates. That 100x100 box is mapped
+// onto the square exactly circumscribing the circle (side = diameter =
+// 2*18.71 = 37.42, centered at the origin), so e.g. (50,0)/(0,50) land on
+// the circle's top/left points and (30,80)/(80,30) fall inside it.
+const X_ICON_9 = `
+  <g>
+    <symbol id="x-icon-9" viewBox="-19.71 -19.71 39.42 39.42">
+      <circle cx="0" cy="0" r="18.71" fill="#ffffff" stroke="#000000" stroke-width="2" />
+    </symbol>
+    <use href="#x-icon-9" x="-19.71" y="-19.71" width="39.42" height="39.42" />
+    <symbol id="x-icon-9-overlay" viewBox="0 0 100 100">
+      <polygon points="50,0 0,50 30,80 80,30" fill="#0000ff" />
+    </symbol>
+    <use href="#x-icon-9-overlay" x="-18.71" y="-18.71" width="37.42" height="37.42" />
+  </g>
+`;
+
+const X_ICON_11 = `
+  <g>
+    <symbol id="x-icon-11" viewBox="-19.71 -19.71 39.42 39.42">
+      <circle cx="0" cy="0" r="18.71" fill="#ffffff" stroke="#000000" stroke-width="2" />
+    </symbol>
+    <use href="#x-icon-11" x="-19.71" y="-19.71" width="39.42" height="39.42" />
+    <symbol id="x-icon-11-overlay" viewBox="0 0 100 100">
+      <polygon points="50,0 0,50 30,80 70,80 60,50 80,30" fill="#0000ff" />
+    </symbol>
+    <use href="#x-icon-11-overlay" x="-18.71" y="-18.71" width="37.42" height="37.42" />
+  </g>
+`;
+
 // Parses a snippet of SVG markup (e.g. X_ICON_0) into a detached element
 // that can be appended into the scene.
 const parseSvgFragment = (markup) => {
@@ -692,3 +725,7 @@ placeIcon(X_ICON_7, 5, 5, 1);
 placeIcon(X_ICON_7, 5, 6, 3);
 placeIcon(X_ICON_8, 5, 5, 5);
 placeIcon(X_ICON_8, 5, 6, 5);
+placeIcon(X_ICON_9, 5, 3, 3);
+placeIcon(X_ICON_9, 3, 3, 1);
+placeIcon(X_ICON_11, 2, 1, 4);
+placeIcon(X_ICON_11, 1, 6, 1);
