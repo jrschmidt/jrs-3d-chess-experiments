@@ -1,35 +1,13 @@
 <!doctype html>
 <html lang="en">
-<head>
-<meta charset="utf-8">
-<title>5x5x8 Cube</title>
-<style>
-  html, body {
-    margin: 0;
-    height: 100%;
-    background: #2f3f4f;
-    color: #cdd3de;
-    font-family: system-ui, sans-serif;
-    -webkit-user-select: none;
-    user-select: none;
-  }
-  #caption {
-    position: fixed;
-    top: 12px;
-    left: 16px;
-    font-size: 13px;
-    opacity: 0.7;
-  }
-  svg {
-    display: block;
-    width: 100vw;
-    height: 100vh;
-  }
-</style>
-</head>
-<body>
-  <div id="caption">5x5x8 &mdash; with 3d diagonals<br>(blue, purple, orange, green)</div>
-  <svg id="scene"></svg>
-  <script src="app.js"></script>
-</body>
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>x3d-chess</title>
+  </head>
+  <body>
+    <div id="app"></div>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
 </html>

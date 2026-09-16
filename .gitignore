@@ -1,4 +1,15 @@
+# Legacy
 .DS_Store
 prompt.txt
 node_modules/
 .claude/skills/run-clc-26-004/screenshot*.png
+
+# Vite
+dist
+dist-ssr
+*.local
+
+# Logs
+logs
+*.log
+npm-debug.log*
