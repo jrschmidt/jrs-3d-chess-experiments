@@ -209,56 +209,8 @@ const rhombusCorners = (half) => {
   ];
 };
 
-
-
-// A solid red rhombus, sized to half the width and height of a cell's
-// footprint (see rhombusCorners), for exercising placeIcon.
-const X_ICON_0 = `<polygon points="${pointsAttr(rhombusCorners(ICON_HALF))}" fill="#ff0000" />`;
-
-// Same shape as X_ICON_0, but with literal corner coordinates instead of
-// a computed pointsAttr(rhombusCorners(...)) call.
-const X_ICON_1 = `<polygon points="0.00,11.97 32.89,0.00 0.00,-11.97 -32.89,0.00" fill="#00ff00" />`;
-const X_ICON_2 = `<polygon points="0.00,12 32,0.00 0.00,-12 -32,0.00" fill="#0000ff" />`;
-
-// Same shape as X_ICON_0/X_ICON_1, but built with <symbol>/<use> instead
-// of a bare <polygon>: the symbol defines the rhombus in its own viewBox
-// coordinate space, and <use> instances it at that same size/offset (so the
-// mapping from symbol viewBox to use's x/y/width/height is 1:1, and the
-// rhombus ends up centered at the origin exactly as the other icons are).
-// Wrapped in a single <g> since parseSvgFragment appends only the fragment's
-// first element child.
-
-const X_ICON_4 = `
-  <g>
-    <symbol id="x-icon-4" viewBox="-33 -12 66 24">
-      <polygon points="0,12 32,0 0,-12 -32,0" fill="#ff8800" />
-    </symbol>
-    <use href="#x-icon-4" x="-33" y="-12" width="66" height="24" />
-  </g>
-`;
-
-// Same rhombus as X_ICON_4, plus a black square centered on the rhombus's
-// center with each corner on one of the rhombus's edges (x/32 + y/12 = 1
-// solved for the square's corner (s,s) gives s = 96/11 ≈ 8.73 — the square
-// requirement, unlike an arbitrary rectangle, fully determines this size).
-const X_ICON_6 = `
-  <g>
-    <symbol id="x-icon-6" viewBox="-33 -12 66 24">
-      <polygon points="0,12 32,0 0,-12 -32,0" fill="#ff8800" />
-      <rect x="-8.73" y="-8.73" width="17.46" height="17.46" fill="#000000" />
-    </symbol>
-    <use href="#x-icon-6" x="-33" y="-12" width="66" height="24" />
-  </g>
-`;
-
-const X_ICON_7 = `
-  <g>
-    <symbol id="x-icon-7" viewBox="-16 -16 31 31">
-      <rect x="-16" y="-16" width="31" height="31" fill="#000000" />
-    </symbol>
-    <use href="#x-icon-7" x="-16" y="-16" width="31" height="31" />
-  </g>
-`;
+// I am keeping these comments for the time being, including commented out code
+// for X_ICON_8 and X_ICON_9, as we further develop the icons and their SVG code.
 
 // Same box-fitting approach as X_ICON_7, but a white circle (with a black
 // outline) instead of the black square — radius is the midpoint between
@@ -269,14 +221,14 @@ const X_ICON_7 = `
 // single-translate convention. viewBox/use box is grown to fit the circle
 // plus its 2px outline so nothing gets clipped (same issue X_ICON_7 hit
 // with its square).
-const X_ICON_8 = `
-  <g>
-    <symbol id="x-icon-8" viewBox="-19.71 -19.71 39.42 39.42">
-      <circle cx="0" cy="0" r="18.71" fill="#ffffff" stroke="#000000" stroke-width="2" />
-    </symbol>
-    <use href="#x-icon-8" x="-19.71" y="-19.71" width="39.42" height="39.42" />
-  </g>
-`;
+// const X_ICON_8 = `
+//   <g>
+//     <symbol id="x-icon-8" viewBox="-19.71 -19.71 39.42 39.42">
+//       <circle cx="0" cy="0" r="18.71" fill="#ffffff" stroke="#000000" stroke-width="2" />
+//     </symbol>
+//     <use href="#x-icon-8" x="-19.71" y="-19.71" width="39.42" height="39.42" />
+//   </g>
+// `;
 
 // X_ICON_8's circle, plus an arbitrary polygon overlay drawn on top via a
 // second, nested <symbol>/<use> pair — same viewBox-mapping trick used
@@ -285,29 +237,33 @@ const X_ICON_8 = `
 // onto the square exactly circumscribing the circle (side = diameter =
 // 2*18.71 = 37.42, centered at the origin), so e.g. (50,0)/(0,50) land on
 // the circle's top/left points and (30,80)/(80,30) fall inside it.
-const X_ICON_9 = `
-  <g>
-    <symbol id="x-icon-9" viewBox="-19.71 -19.71 39.42 39.42">
-      <circle cx="0" cy="0" r="18.71" fill="#ffffff" stroke="#000000" stroke-width="2" />
-    </symbol>
-    <use href="#x-icon-9" x="-19.71" y="-19.71" width="39.42" height="39.42" />
-    <symbol id="x-icon-9-overlay" viewBox="0 0 100 100">
-      <polygon points="50,0 0,50 30,80 80,30" fill="#0000ff" />
-    </symbol>
-    <use href="#x-icon-9-overlay" x="-18.71" y="-18.71" width="37.42" height="37.42" />
-  </g>
-`;
+// const X_ICON_9 = `
+//   <g>
+//     <symbol id="x-icon-9" viewBox="-19.71 -19.71 39.42 39.42">
+//       <circle cx="0" cy="0" r="18.71" fill="#ffffff" stroke="#000000" stroke-width="2" />
+//     </symbol>
+//     <use href="#x-icon-9" x="-19.71" y="-19.71" width="39.42" height="39.42" />
+//     <symbol id="x-icon-9-overlay" viewBox="0 0 100 100">
+//       <polygon points="50,0 0,50 30,80 80,30" fill="#0000ff" />
+//     </symbol>
+//     <use href="#x-icon-9-overlay" x="-18.71" y="-18.71" width="37.42" height="37.42" />
+//   </g>
+// `;
 
-const X_ICON_11 = `
+const ICON_K_W = `
   <g>
-    <symbol id="x-icon-11" viewBox="-19.71 -19.71 39.42 39.42">
-      <circle cx="0" cy="0" r="18.71" fill="#ffffff" stroke="#000000" stroke-width="2" />
+    <symbol id="x-icon-k-w" viewBox="-20 -20 40 40">
+      <circle cx="0" cy="0" r="19" fill="#cccccc" stroke="#000000" stroke-width="2" />
     </symbol>
-    <use href="#x-icon-11" x="-19.71" y="-19.71" width="39.42" height="39.42" />
-    <symbol id="x-icon-11-overlay" viewBox="0 0 100 100">
-      <polygon points="50,0 0,50 30,80 70,80 60,50 80,30" fill="#0000ff" />
+    <use href="#x-icon-k-w" x="-20" y="-20" width="40" height="40" />
+    <symbol id="x-icon-k-w-overlay" viewBox="0 0 100 100">
+      <polygon
+        points="35,5 65,5 65,35 95,35 95,65 65,65 65,80 90,80 80,90 60,100
+          40,100 20,90 10,80 35,80 35,65 5,65 5,35 35,35"
+        fill="#333333"
+      />
     </symbol>
-    <use href="#x-icon-11-overlay" x="-18.71" y="-18.71" width="37.42" height="37.42" />
+    <use href="#x-icon-k-w-overlay" x="-19" y="-19" width="38" height="38" />
   </g>
 `;
 
@@ -715,17 +671,19 @@ const buildScene = () => {
 
 buildScene();
 
-placeIcon(X_ICON_0, 5, 4, 3);
-placeIcon(X_ICON_0, 5, 6, 4);
-placeIcon(X_ICON_1, 5, 3, 5);
-placeIcon(X_ICON_2, 5, 2, 5);
-placeIcon(X_ICON_4, 5, 8, 5);
-placeIcon(X_ICON_6, 5, 8, 3);
-placeIcon(X_ICON_7, 5, 5, 1);
-placeIcon(X_ICON_7, 5, 6, 3);
-placeIcon(X_ICON_8, 5, 5, 5);
-placeIcon(X_ICON_8, 5, 6, 5);
-placeIcon(X_ICON_9, 5, 3, 3);
-placeIcon(X_ICON_9, 3, 3, 1);
-placeIcon(X_ICON_11, 2, 1, 4);
-placeIcon(X_ICON_11, 1, 6, 1);
+placeIcon(ICON_K_W, 5, 4, 3);
+placeIcon(ICON_K_W, 5, 6, 4);
+placeIcon(ICON_K_W, 5, 3, 5);
+placeIcon(ICON_K_W, 5, 2, 5);
+placeIcon(ICON_K_W, 5, 8, 5);
+placeIcon(ICON_K_W, 5, 8, 3);
+placeIcon(ICON_K_W, 5, 5, 1);
+placeIcon(ICON_K_W, 5, 6, 3);
+placeIcon(ICON_K_W, 5, 5, 5);
+placeIcon(ICON_K_W, 5, 6, 5);
+placeIcon(ICON_K_W, 5, 3, 3);
+placeIcon(ICON_K_W, 3, 3, 1);
+placeIcon(ICON_K_W, 2, 1, 4);
+placeIcon(ICON_K_W, 1, 6, 1);
+placeIcon(ICON_K_W, 4, 5, 1);
+placeIcon(ICON_K_W, 3, 5, 1);
