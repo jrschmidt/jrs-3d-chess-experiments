@@ -11,8 +11,8 @@ We are splitting a single 800-line monolithic JavaScript file into 7–8 clean, 
 2. **State/Data Level:** Isolate shared state, storage, and API logic.
 3. **UI/Component Level:** Move DOM manipulation and event listeners last.
 
-### Directory Structure Requirements
-Ensure all new files follow this layout:
+### Directory Structure Guidelines
+New files should follow a layout similar to the following:
 - `src/utils/` - Pure helper functions (math, formatting, validation).
 - `src/api/` - Fetch requests and API interactions.
 - `src/state/` - App state, reactive storage, and state-modifier functions.
