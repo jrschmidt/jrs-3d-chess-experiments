@@ -635,12 +635,12 @@ placeGamePiece('K', 'black', { level: 5, rank: 8, file: 5 });
 placeGamePiece('K', 'white', { level: 5, rank: 8, file: 3 });
 placeGamePiece('Q', 'black', { level: 5, rank: 5, file: 1 });
 placeGamePiece('Q', 'white', { level: 5, rank: 6, file: 3 });
-placeGamePiece('K', 'black', { level: 5, rank: 5, file: 5 });
-placeGamePiece('K', 'white', { level: 5, rank: 6, file: 5 });
+placeGamePiece('R', 'black', { level: 5, rank: 5, file: 5 });
+placeGamePiece('R', 'white', { level: 5, rank: 6, file: 5 });
 placeGamePiece('Q', 'black', { level: 5, rank: 3, file: 3 });
 placeGamePiece('Q', 'white', { level: 3, rank: 3, file: 1 });
-placeGamePiece('K', 'black', { level: 2, rank: 1, file: 4 });
-placeGamePiece('K', 'white', { level: 1, rank: 6, file: 1 });
+placeGamePiece('R', 'black', { level: 2, rank: 1, file: 4 });
+placeGamePiece('R', 'white', { level: 1, rank: 6, file: 1 });
 placeGamePiece('Q', 'black', { level: 4, rank: 5, file: 1 });
 placeGamePiece('Q', 'white', { level: 3, rank: 5, file: 1 });
 

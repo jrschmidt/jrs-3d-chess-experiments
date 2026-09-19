@@ -107,9 +107,47 @@ const ICON_Q_B = `
   </g>
 `;
 
+const ICON_R_W = `
+  <g>
+    <symbol id="x-icon-r-w" viewBox="-20 -20 40 40">
+      <circle cx="0" cy="0" r="19" fill="#6f6f60" stroke="#000000" stroke-width="2" />
+    </symbol>
+    <use href="#x-icon-r-w" x="-20" y="-20" width="40" height="40" />
+    <symbol id="x-icon-r-w-overlay" viewBox="0 0 100 100">
+      <polygon
+        points="20,10 35,10 35,20 42,20 42,10 58,10 58,20 65,20 65,10 80,10
+          80,25 70,55 70,80 90,80 80,90 60,100
+          40,100 20,90 10,80 30,80 30,55 20,35"
+        fill="#ffffff"
+      />
+    </symbol>
+    <use href="#x-icon-r-w-overlay" x="-19" y="-19" width="38" height="38" />
+  </g>
+`;
+
+const ICON_R_B = `
+  <g>
+    <symbol id="x-icon-r-b" viewBox="-20 -20 40 40">
+      <circle cx="0" cy="0" r="19" fill="#6f6f60" stroke="#000000" stroke-width="2" />
+    </symbol>
+    <use href="#x-icon-r-b" x="-20" y="-20" width="40" height="40" />
+    <symbol id="x-icon-r-b-overlay" viewBox="0 0 100 100">
+      <polygon
+        points="20,10 35,10 35,20 42,20 42,10 58,10 58,20 65,20 65,10 80,10
+          80,25 70,55 70,80 90,80 80,90 60,100
+          40,100 20,90 10,80 30,80 30,55 20,35"
+        fill="#000000"
+      />
+    </symbol>
+    <use href="#x-icon-r-b-overlay" x="-19" y="-19" width="38" height="38" />
+  </g>
+`;
+
 export const PIECE_ICONS = {
   kw: ICON_K_W,
   kb: ICON_K_B,
   qw: ICON_Q_W,
   qb: ICON_Q_B,
+  rw: ICON_R_W,
+  rb: ICON_R_B,
 } as const;
