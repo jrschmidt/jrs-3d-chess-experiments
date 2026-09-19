@@ -1,5 +1,6 @@
 // @ts-nocheck
 import { PIECE_ICONS } from './render/pieceIcons.ts';
+import { placeGamePiece, getBoardPositions } from './state/gameState.ts';
 
 
 // A single 5x5x8 cube, rendered in isometric view. (rank, level, file) are
@@ -199,7 +200,7 @@ const cellFootprintInset = (rank, level, file, marginPx) =>
 
 // Corners of a rhombus with half-extent `half` along the rank/file axes,
 // centered at the origin (unpositioned) — the building block for icon
-// shapes that placeIcon then translates onto a specific cell.
+// shapes that renderPieceIcon then translates onto a specific cell.
 const rhombusCorners = (half) => {
   const rMin = scale(V_RANK, -half);
   const rMax = scale(V_RANK, half);
@@ -223,15 +224,24 @@ const parseSvgFragment = (markup) => {
   return doc.documentElement.firstElementChild;
 };
 
-// Draws the icon keyed by `iconKey` in PIECE_ICONS (e.g. "kb") centered on
-// cell (l, r, f)'s floor footprint.
-const placeIcon = (iconKey, l, r, f) => {
+// Draws the icon for a (type, color) piece (e.g. "K"/"black" -> PIECE_ICONS
+// key "kb") centered on `location`'s cell floor footprint.
+const renderPieceIcon = (type, color, location) => {
+  const iconKey = `${type.toLowerCase()}${color[0]}`;
+  const { level, rank, file } = location;
   const sceneEl = document.getElementById("scene");
-  const center = add(projectCenter(r, l, f), scale(V_LEVEL, -HALF));
+  const center = add(projectCenter(rank, level, file), scale(V_LEVEL, -HALF));
   const g = svgEl("g", { transform: `translate(${center.x.toFixed(2)}, ${center.y.toFixed(2)})` });
   g.appendChild(parseSvgFragment(PIECE_ICONS[iconKey]));
   sceneEl.appendChild(g);
   return g;
+};
+
+// Draws every piece currently in the game state's board positions.
+const renderPieceIcons = () => {
+  for (const piece of getBoardPositions()) {
+    renderPieceIcon(piece.type, piece.color, piece.location);
+  }
 };
 
 // Checkerboard parity: a cell is "dark" when rank + level + file is odd.
@@ -617,19 +627,21 @@ const buildScene = () => {
 
 buildScene();
 
-placeIcon("kb", 5, 4, 3);
-placeIcon("kw", 5, 6, 4);
-placeIcon("qb", 5, 3, 5);
-placeIcon("qw", 5, 2, 5);
-placeIcon("kb", 5, 8, 5);
-placeIcon("kw", 5, 8, 3);
-placeIcon("qb", 5, 5, 1);
-placeIcon("qw", 5, 6, 3);
-placeIcon("kb", 5, 5, 5);
-placeIcon("kw", 5, 6, 5);
-placeIcon("qb", 5, 3, 3);
-placeIcon("qw", 3, 3, 1);
-placeIcon("kb", 2, 1, 4);
-placeIcon("kw", 1, 6, 1);
-placeIcon("qb", 4, 5, 1);
-placeIcon("qw", 3, 5, 1);
+placeGamePiece('K', 'black', { level: 5, rank: 4, file: 3 });
+placeGamePiece('K', 'white', { level: 5, rank: 6, file: 4 });
+placeGamePiece('Q', 'black', { level: 5, rank: 3, file: 5 });
+placeGamePiece('Q', 'white', { level: 5, rank: 2, file: 5 });
+placeGamePiece('K', 'black', { level: 5, rank: 8, file: 5 });
+placeGamePiece('K', 'white', { level: 5, rank: 8, file: 3 });
+placeGamePiece('Q', 'black', { level: 5, rank: 5, file: 1 });
+placeGamePiece('Q', 'white', { level: 5, rank: 6, file: 3 });
+placeGamePiece('K', 'black', { level: 5, rank: 5, file: 5 });
+placeGamePiece('K', 'white', { level: 5, rank: 6, file: 5 });
+placeGamePiece('Q', 'black', { level: 5, rank: 3, file: 3 });
+placeGamePiece('Q', 'white', { level: 3, rank: 3, file: 1 });
+placeGamePiece('K', 'black', { level: 2, rank: 1, file: 4 });
+placeGamePiece('K', 'white', { level: 1, rank: 6, file: 1 });
+placeGamePiece('Q', 'black', { level: 4, rank: 5, file: 1 });
+placeGamePiece('Q', 'white', { level: 3, rank: 5, file: 1 });
+
+renderPieceIcons();
