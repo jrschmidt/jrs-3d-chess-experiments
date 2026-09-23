@@ -138,6 +138,44 @@ const ICON_B_W = `
   </g>
 `;
 
+const ICON_T_W = `
+  <g>
+    <symbol id="x-icon-t-w" viewBox="-20 -20 40 40">
+      <circle cx="0" cy="0" r="19" fill="#6f6f60" stroke="#000000" stroke-width="2" />
+    </symbol>
+    <use href="#x-icon-t-w" x="-20" y="-20" width="40" height="40" />
+    <symbol id="x-icon-t-w-overlay" viewBox="0 0 100 100">
+      <path
+        d="M 50 0 L 60 15 L 60 60 L 82 60 A 33 33 0 0 0 76 30 L 83 20
+          A 45 45 0 0 1 85 80 L 65 80 L 65 97 A 50 50 0 0 1 35 97
+          L 35 80 L 15 80 A 45 45 0 0 1 10 30 L 17 20 L 24 30
+          A 33 33 0 0 0 18 60 L 40 60 L40 15 Z"
+        fill="#ffffff"
+      />
+    </symbol>
+    <use href="#x-icon-t-w-overlay" x="-19" y="-19" width="38" height="38" />
+  </g>
+`;
+
+const ICON_T_B = `
+  <g>
+    <symbol id="x-icon-t-b" viewBox="-20 -20 40 40">
+      <circle cx="0" cy="0" r="19" fill="#6f6f60" stroke="#000000" stroke-width="2" />
+    </symbol>
+    <use href="#x-icon-t-b" x="-20" y="-20" width="40" height="40" />
+    <symbol id="x-icon-t-b-overlay" viewBox="0 0 100 100">
+      <path
+        d="M 50 0 L 60 15 L 60 60 L 82 60 A 33 33 0 0 0 76 30 L 83 20
+          A 45 45 0 0 1 85 80 L 65 80 L 65 97 A 50 50 0 0 1 35 97
+          L 35 80 L 15 80 A 45 45 0 0 1 10 30 L 17 20 L 24 30
+          A 33 33 0 0 0 18 60 L 40 60 L40 15 Z"
+        fill="#000000"
+      />
+    </symbol>
+    <use href="#x-icon-t-b-overlay" x="-19" y="-19" width="38" height="38" />
+  </g>
+`;
+
 const ICON_P_W = `
   <g>
     <symbol id="x-icon-p-w" viewBox="-20 -20 40 40">
@@ -183,6 +221,8 @@ export const PIECE_ICONS = {
   rb: ICON_R_B,
   bb: ICON_B_B,
   bw: ICON_B_W,
+  tw: ICON_T_W,
+  tb: ICON_T_B,
   pw: ICON_P_W,
   pb: ICON_P_B
 } as const;
