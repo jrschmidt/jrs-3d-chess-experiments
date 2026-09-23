@@ -627,21 +627,25 @@ const buildScene = () => {
 
 buildScene();
 
-placeGamePiece('K', 'black', { level: 5, rank: 4, file: 3 });
+placeGamePiece('K', 'white', { level: 1, rank: 1, file: 2 });
 placeGamePiece('K', 'white', { level: 5, rank: 6, file: 4 });
-placeGamePiece('Q', 'black', { level: 5, rank: 3, file: 5 });
+placeGamePiece('K', 'black', { level: 4, rank: 1, file: 4 });
+placeGamePiece('K', 'black', { level: 5, rank: 4, file: 3 });
+placeGamePiece('Q', 'white', { level: 3, rank: 5, file: 1 });
 placeGamePiece('Q', 'white', { level: 5, rank: 2, file: 5 });
-placeGamePiece('B', 'black', { level: 5, rank: 8, file: 5 });
+placeGamePiece('Q', 'black', { level: 3, rank: 2, file: 1 });
+placeGamePiece('Q', 'black', { level: 5, rank: 3, file: 5 });
+placeGamePiece('B', 'white', { level: 4, rank: 6, file: 1 });
 placeGamePiece('B', 'white', { level: 5, rank: 8, file: 3 });
 placeGamePiece('B', 'black', { level: 5, rank: 5, file: 1 });
-placeGamePiece('B', 'white', { level: 5, rank: 6, file: 3 });
-placeGamePiece('R', 'black', { level: 5, rank: 5, file: 5 });
+placeGamePiece('B', 'black', { level: 5, rank: 8, file: 5 });
+placeGamePiece('R', 'white', { level: 5, rank: 3, file: 3 });
 placeGamePiece('R', 'white', { level: 5, rank: 6, file: 5 });
-placeGamePiece('Q', 'black', { level: 5, rank: 3, file: 3 });
-placeGamePiece('Q', 'white', { level: 3, rank: 3, file: 1 });
-placeGamePiece('R', 'black', { level: 2, rank: 1, file: 4 });
-placeGamePiece('R', 'white', { level: 1, rank: 6, file: 1 });
-placeGamePiece('Q', 'black', { level: 4, rank: 5, file: 1 });
-placeGamePiece('Q', 'white', { level: 3, rank: 5, file: 1 });
+placeGamePiece('R', 'black', { level: 4, rank: 5, file: 1 });
+placeGamePiece('R', 'black', { level: 5, rank: 5, file: 5 });
+placeGamePiece('P', 'white', { level: 1, rank: 5, file: 1 });
+placeGamePiece('P', 'white', { level: 4, rank: 1, file: 3 });
+placeGamePiece('P', 'black', { level: 1, rank: 2, file: 1 });
+placeGamePiece('P', 'black', { level: 2, rank: 1, file: 4 });
 
 renderPieceIcons();
