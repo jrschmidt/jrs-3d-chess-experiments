@@ -66,6 +66,46 @@ const ICON_Q_B = `
   </g>
 `;
 
+const ICON_E_W = `
+  <g>
+    <symbol id="x-icon-e-w" viewBox="-20 -20 40 40">
+      <circle cx="0" cy="0" r="19" fill="#6f6f60" stroke="#000000" stroke-width="2" />
+    </symbol>
+    <use href="#x-icon-e-w" x="-20" y="-20" width="40" height="40" />
+    <symbol id="x-icon-e-w-overlay" viewBox="0 0 100 100">
+      <path
+        d="M 40 45 L 43 35 L 38 30 L 29 32 L 30 37 A 10 10 0 0 1 29 20
+          L 37 17 A 15 15 0 0 1 72 28 L 70 33 L 62 30 L 57 35
+          L 60 45 L 100 45 L 90 55 L 78 55 L 75 60 L 90 60 L 80 70 L 70 70
+          L 60 80 L 90 80 A 50 50 0 0 1 10 80 L 40 80 L 30 70
+          L 20 70 L 10 60 L 25 60 L 22 55 L 10 55 L 0 45 Z"
+        fill="#ffffff"
+      />
+    </symbol>
+    <use href="#x-icon-e-w-overlay" x="-19" y="-19" width="38" height="38" />
+  </g>
+`;
+
+const ICON_E_B = `
+  <g>
+    <symbol id="x-icon-e-b" viewBox="-20 -20 40 40">
+      <circle cx="0" cy="0" r="19" fill="#6f6f60" stroke="#000000" stroke-width="2" />
+    </symbol>
+    <use href="#x-icon-e-b" x="-20" y="-20" width="40" height="40" />
+    <symbol id="x-icon-e-b-overlay" viewBox="0 0 100 100">
+      <path
+        d="M 40 45 L 43 35 L 38 30 L 29 32 L 30 37 A 10 10 0 0 1 29 20
+          L 37 17 A 15 15 0 0 1 72 28 L 70 33 L 62 30 L 57 35
+          L 60 45 L 100 45 L 90 55 L 78 55 L 75 60 L 90 60 L 80 70 L 70 70
+          L 60 80 L 90 80 A 50 50 0 0 1 10 80 L 40 80 L 30 70
+          L 20 70 L 10 60 L 25 60 L 22 55 L 10 55 L 0 45 Z"
+        fill="#000000"
+      />
+    </symbol>
+    <use href="#x-icon-e-b-overlay" x="-19" y="-19" width="38" height="38" />
+  </g>
+`;
+
 const ICON_R_W = `
   <g>
     <symbol id="x-icon-r-w" viewBox="-20 -20 40 40">
@@ -217,6 +257,8 @@ export const PIECE_ICONS = {
   kb: ICON_K_B,
   qw: ICON_Q_W,
   qb: ICON_Q_B,
+  ew: ICON_E_W,
+  eb: ICON_E_B,
   rw: ICON_R_W,
   rb: ICON_R_B,
   bb: ICON_B_B,
@@ -224,5 +266,5 @@ export const PIECE_ICONS = {
   tw: ICON_T_W,
   tb: ICON_T_B,
   pw: ICON_P_W,
-  pb: ICON_P_B
+  pb: ICON_P_B,
 } as const;
