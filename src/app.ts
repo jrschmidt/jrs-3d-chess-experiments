@@ -1,14 +1,15 @@
-// A single 5x5x8 cube, rendered in isometric view. (rank, level, file) are
-// coordinates of a cell within that one cube — see plan doc for full definition.
-//   level 1..LEVEL_MAX  1 = bottom, LEVEL_MAX = top
-//   rank  1..RANK_MAX   1 = front,  RANK_MAX = back
-//   file  1..FILE_MAX   1 = left (as seen from front), FILE_MAX = right
+// @ts-nocheck
+import { PIECE_ICONS } from './render/pieceIcons.ts';
+import { placeGamePiece, getBoardPositions } from './state/gameState.ts';
+import { LEVEL_MAX, RANK_MAX, FILE_MAX, PITCH } from './render/constants.ts';
+import { SVG_NS, svgEl } from './render/svg.ts';
+import { buildFocusWidget } from './ui/focusWidget.ts';
+import { buildDiagToggle } from './ui/diagToggle.ts';
+
+
+// Cell coordinates (rank, level, file) are defined in render/constants.ts.
 // Shorthand (l, r, f) = (level, rank, file) is used below wherever a cell's
 // diagonal-set membership is computed.
-
-const LEVEL_MAX = 5;
-const RANK_MAX = 8;
-const FILE_MAX = 5;
 
 // A "floor" is a thin outline tracing the full rank x file perimeter of each
 // level — a subtle visual aid for telling the five levels of the cube apart.
@@ -60,7 +61,6 @@ const DIAG_COLORS = {
   diag_d: DIAG_GREEN,
 };
 
-const PITCH = 70;         // world-unit distance between adjacent cell coordinates
 const CELL_FRACTION = 1;    // fraction of PITCH each cell's floor occupies (1 = cells abut, no gap)
 const HALF = CELL_FRACTION / 2;
 const ICON_HALF = HALF / 2;    // half-cell scale (half width/height of the cell footprint) used for icons
@@ -195,7 +195,7 @@ const cellFootprintInset = (rank, level, file, marginPx) =>
 
 // Corners of a rhombus with half-extent `half` along the rank/file axes,
 // centered at the origin (unpositioned) — the building block for icon
-// shapes that placeIcon then translates onto a specific cell.
+// shapes that renderPieceIcon then translates onto a specific cell.
 const rhombusCorners = (half) => {
   const rMin = scale(V_RANK, -half);
   const rMax = scale(V_RANK, half);
@@ -209,115 +209,6 @@ const rhombusCorners = (half) => {
   ];
 };
 
-// I am keeping these comments for the time being, including commented out code
-// for X_ICON_8 and X_ICON_9, as we further develop the icons and their SVG code.
-
-// Same box-fitting approach as X_ICON_7, but a white circle (with a black
-// outline) instead of the black square — radius is the midpoint between
-// the circle inscribed in a 31-side square (r=15.5) and the one
-// circumscribed around it (r=15.5*sqrt(2)~=21.92), i.e. ~18.71. Centered at
-// the origin (unlike X_ICON_7's square, which is centered at (-0.5,-0.5))
-// so it lands exactly on the cell footprint's center, per placeIcon's
-// single-translate convention. viewBox/use box is grown to fit the circle
-// plus its 2px outline so nothing gets clipped (same issue X_ICON_7 hit
-// with its square).
-// const X_ICON_8 = `
-//   <g>
-//     <symbol id="x-icon-8" viewBox="-19.71 -19.71 39.42 39.42">
-//       <circle cx="0" cy="0" r="18.71" fill="#ffffff" stroke="#000000" stroke-width="2" />
-//     </symbol>
-//     <use href="#x-icon-8" x="-19.71" y="-19.71" width="39.42" height="39.42" />
-//   </g>
-// `;
-
-// X_ICON_8's circle, plus an arbitrary polygon overlay drawn on top via a
-// second, nested <symbol>/<use> pair — same viewBox-mapping trick used
-// throughout X_ICON_3-X_ICON_8, but with viewBox="0 0 100 100" so a polygon
-// can be authored directly in 0-100 coordinates. That 100x100 box is mapped
-// onto the square exactly circumscribing the circle (side = diameter =
-// 2*18.71 = 37.42, centered at the origin), so e.g. (50,0)/(0,50) land on
-// the circle's top/left points and (30,80)/(80,30) fall inside it.
-// const X_ICON_9 = `
-//   <g>
-//     <symbol id="x-icon-9" viewBox="-19.71 -19.71 39.42 39.42">
-//       <circle cx="0" cy="0" r="18.71" fill="#ffffff" stroke="#000000" stroke-width="2" />
-//     </symbol>
-//     <use href="#x-icon-9" x="-19.71" y="-19.71" width="39.42" height="39.42" />
-//     <symbol id="x-icon-9-overlay" viewBox="0 0 100 100">
-//       <polygon points="50,0 0,50 30,80 80,30" fill="#0000ff" />
-//     </symbol>
-//     <use href="#x-icon-9-overlay" x="-18.71" y="-18.71" width="37.42" height="37.42" />
-//   </g>
-// `;
-
-const ICON_K_W = `
-  <g>
-    <symbol id="x-icon-k-w" viewBox="-20 -20 40 40">
-      <circle cx="0" cy="0" r="19" fill="#6f6f60" stroke="#000000" stroke-width="2" />
-    </symbol>
-    <use href="#x-icon-k-w" x="-20" y="-20" width="40" height="40" />
-    <symbol id="x-icon-k-w-overlay" viewBox="0 0 100 100">
-      <polygon
-        points="35,5 65,5 65,35 95,35 95,65 65,65 65,80 90,80 80,90 60,100
-          40,100 20,90 10,80 35,80 35,65 5,65 5,35 35,35"
-        fill="#ffffff"
-      />
-    </symbol>
-    <use href="#x-icon-k-w-overlay" x="-19" y="-19" width="38" height="38" />
-  </g>
-`;
-
-const ICON_K_B = `
-  <g>
-    <symbol id="x-icon-k-b" viewBox="-20 -20 40 40">
-      <circle cx="0" cy="0" r="19" fill="#6f6f60" stroke="#000000" stroke-width="2" />
-    </symbol>
-    <use href="#x-icon-k-b" x="-20" y="-20" width="40" height="40" />
-    <symbol id="x-icon-k-b-overlay" viewBox="0 0 100 100">
-      <polygon
-        points="35,5 65,5 65,35 95,35 95,65 65,65 65,80 90,80 80,90 60,100
-          40,100 20,90 10,80 35,80 35,65 5,65 5,35 35,35"
-        fill="#000000"
-      />
-    </symbol>
-    <use href="#x-icon-k-b-overlay" x="-19" y="-19" width="38" height="38" />
-  </g>
-`;
-
-const ICON_Q_W = `
-  <g>
-    <symbol id="x-icon-q-w" viewBox="-20 -20 40 40">
-      <circle cx="0" cy="0" r="19" fill="#6f6f60" stroke="#000000" stroke-width="2" />
-    </symbol>
-    <use href="#x-icon-q-w" x="-20" y="-20" width="40" height="40" />
-    <symbol id="x-icon-q-w-overlay" viewBox="0 0 100 100">
-      <polygon
-        points="50,30 73,8 67,37 97,33 75,55 75,70 90,80 80,90 60,100
-          40,100 20,90 10,80 25,70 25,55 3,33 33,37 27,8"
-        fill="#ffffff"
-      />
-    </symbol>
-    <use href="#x-icon-q-w-overlay" x="-19" y="-19" width="38" height="38" />
-  </g>
-`;
-
-const ICON_Q_B = `
-  <g>
-    <symbol id="x-icon-q-b" viewBox="-20 -20 40 40">
-      <circle cx="0" cy="0" r="19" fill="#6f6f60" stroke="#000000" stroke-width="2" />
-    </symbol>
-    <use href="#x-icon-q-b" x="-20" y="-20" width="40" height="40" />
-    <symbol id="x-icon-q-b-overlay" viewBox="0 0 100 100">
-      <polygon
-        points="50,30 73,8 67,37 97,33 75,55 75,70 90,80 80,90 60,100
-          40,100 20,90 10,80 25,70 25,55 3,33 33,37 27,8"
-        fill="#000000"
-      />
-    </symbol>
-    <use href="#x-icon-q-b-overlay" x="-19" y="-19" width="38" height="38" />
-  </g>
-`;
-
 // Parses a snippet of SVG markup (e.g. X_ICON_0) into a detached element
 // that can be appended into the scene.
 const parseSvgFragment = (markup) => {
@@ -328,15 +219,24 @@ const parseSvgFragment = (markup) => {
   return doc.documentElement.firstElementChild;
 };
 
-// Draws `svg` (a string of SVG markup, e.g. X_ICON_0) centered on cell
-// (l, r, f)'s floor footprint.
-const placeIcon = (svg, l, r, f) => {
+// Draws the icon for a (type, color) piece (e.g. "K"/"black" -> PIECE_ICONS
+// key "kb") centered on `location`'s cell floor footprint.
+const renderPieceIcon = (type, color, location) => {
+  const iconKey = `${type.toLowerCase()}${color[0]}`;
+  const { level, rank, file } = location;
   const sceneEl = document.getElementById("scene");
-  const center = add(projectCenter(r, l, f), scale(V_LEVEL, -HALF));
+  const center = add(projectCenter(rank, level, file), scale(V_LEVEL, -HALF));
   const g = svgEl("g", { transform: `translate(${center.x.toFixed(2)}, ${center.y.toFixed(2)})` });
-  g.appendChild(parseSvgFragment(svg));
+  g.appendChild(parseSvgFragment(PIECE_ICONS[iconKey]));
   sceneEl.appendChild(g);
   return g;
+};
+
+// Draws every piece currently in the game state's board positions.
+const renderPieceIcons = () => {
+  for (const piece of getBoardPositions()) {
+    renderPieceIcon(piece.type, piece.color, piece.location);
+  }
 };
 
 // Checkerboard parity: a cell is "dark" when rank + level + file is odd.
@@ -363,13 +263,6 @@ const diagForCell = (rank, level, file) => {
 
 // Placeholder visibility rule — subject to change.
 const isVisibleCell = (l, r, f) => l === 5 || r === 1 || f === 1;
-
-const SVG_NS = "http://www.w3.org/2000/svg";
-const svgEl = (tag, attrs) => {
-  const el = document.createElementNS(SVG_NS, tag);
-  for (const [k, v] of Object.entries(attrs)) el.setAttribute(k, v);
-  return el;
-};
 
 // --- Bounding-box helpers ---
 const extendBounds = (b, points) => {
@@ -407,7 +300,6 @@ const updateVerticalHighlights = (focus) => {
 let checkerPolys = [];
 let floorPolys = [];
 let verticalHighlightEls = [];
-let numeralEl = null;
 let diagGroupEl = null;
 
 const refreshFocus = () => {
@@ -418,163 +310,6 @@ const refreshFocus = () => {
     el.setAttribute("stroke", perimeterStroke(boundaryIndex, focusLevel));
   }
   updateVerticalHighlights(focusLevel);
-  numeralEl.textContent = String(focusLevel);
-};
-
-// --- Widget chrome helpers (shared by buildFocusWidget/buildDiagToggle) ---
-const TEXT_STYLE = { "font-family": "system-ui, sans-serif", fill: "#cdd3de" };
-
-const makePanelRect = (x0, y0, w, h) =>
-  svgEl("rect", {
-    x: x0, y: y0, width: w, height: h, rx: 6, ry: 6,
-    fill: "rgba(255,255,255,0.05)",
-    stroke: "rgba(255,255,255,0.25)",
-    "stroke-width": 1,
-  });
-
-const makeHitRect = (x0, y0, w, h, onClick) => {
-  const hit = svgEl("rect", {
-    x: x0, y: y0, width: w, height: h,
-    fill: "rgba(255,255,255,0.001)",
-    style: "cursor: pointer",
-  });
-  hit.addEventListener("click", onClick);
-  return hit;
-};
-
-// Small widget for choosing the focus level: a numeral, an up/down arrow
-// pair, and a "LEVEL" label, anchored so its horizontal midpoint sits on
-// (anchorX, anchorY) — the caller passes the cube's own bottom-right corner
-// so the widget tracks the cube regardless of grid size or tilt angle.
-const buildFocusWidget = (anchorX, anchorY) => {
-  const W = PITCH * 1.0;
-  const H = PITCH * 1.3;
-  const x0 = anchorX - W / 2;
-  const x1 = anchorX + W / 2;
-  const y0 = anchorY - H;
-  const y1 = anchorY;
-  const cx = (x0 + x1) / 2;
-
-  const g = svgEl("g", { id: "focus-widget" });
-
-  g.appendChild(makePanelRect(x0, y0, W, H));
-
-  const labelH = H * 0.22;
-  const label = svgEl("text", {
-    x: cx, y: y0 + labelH * 0.65,
-    "text-anchor": "middle",
-    "font-size": PITCH * 0.16,
-    ...TEXT_STYLE,
-    "letter-spacing": "1.5",
-    opacity: 0.7,
-  });
-  label.textContent = "LEVEL";
-  g.appendChild(label);
-
-  const contentY0 = y0 + labelH;
-  const contentY1 = y1;
-  const numeralColX1 = x0 + W * 0.6;
-  const buttonColX0 = numeralColX1;
-
-  numeralEl = svgEl("text", {
-    x: (x0 + numeralColX1) / 2,
-    y: (contentY0 + contentY1) / 2,
-    "text-anchor": "middle",
-    "dominant-baseline": "central",
-    "font-size": PITCH * 0.55,
-    ...TEXT_STYLE,
-  });
-  numeralEl.textContent = String(focusLevel);
-  g.appendChild(numeralEl);
-
-  const buttonH = (contentY1 - contentY0) / 2;
-  const margin = 6;
-  const bcx = (buttonColX0 + x1) / 2;
-  const halfW = (x1 - buttonColX0) / 2 - margin;
-
-  const makeButton = (yTop, yBottom, pointing, onClick) => {
-    g.appendChild(makeHitRect(buttonColX0, yTop, x1 - buttonColX0, yBottom - yTop, onClick));
-
-    const triTop = yTop + margin;
-    const triBottom = yBottom - margin;
-    const points = pointing === "up"
-      ? `${bcx},${triTop} ${bcx - halfW},${triBottom} ${bcx + halfW},${triBottom}`
-      : `${bcx - halfW},${triTop} ${bcx + halfW},${triTop} ${bcx},${triBottom}`;
-    g.appendChild(svgEl("polygon", {
-      points,
-      fill: "#cdd3de",
-      "pointer-events": "none",
-    }));
-  };
-
-  makeButton(contentY0, contentY0 + buttonH, "up", () => {
-    if (focusLevel < LEVEL_MAX) { focusLevel++; refreshFocus(); }
-  });
-  makeButton(contentY0 + buttonH, contentY1, "down", () => {
-    if (focusLevel > 1) { focusLevel--; refreshFocus(); }
-  });
-
-  return { el: g, minX: x0, minY: y0, maxX: x1, maxY: y1 };
-};
-
-// Binary on/off control for the diagonal-square overlay, anchored so its
-// left edge sits at anchorLeftX and its vertical midpoint sits at
-// anchorCenterY (the caller passes the focus widget's right edge and
-// vertical center, so it sits alongside it). A 3-line title sits above the
-// clickable button, which itself just reads "ON"/"OFF".
-const TITLE_LINES = ["SHOW THREE", "DIMENSIONAL", "DIAGONALS"];
-
-const buildDiagToggle = (anchorLeftX, anchorCenterY) => {
-  const W = PITCH * 1.3;
-  const titleFontSize = PITCH * 0.12;
-  const titleLineHeight = titleFontSize * 1.3;
-  const titleH = titleLineHeight * TITLE_LINES.length + PITCH * 0.08;
-  const buttonH = PITCH * 0.45;
-  const H = titleH + buttonH;
-  const x0 = anchorLeftX;
-  const x1 = anchorLeftX + W;
-  const y0 = anchorCenterY - H / 2;
-  const y1 = anchorCenterY + H / 2;
-  const buttonY0 = y0 + titleH;
-  const cx = (x0 + x1) / 2;
-  const buttonCy = (buttonY0 + y1) / 2;
-
-  const g = svgEl("g", { id: "diag-toggle" });
-
-  const title = svgEl("text", {
-    x: cx, y: y0 + titleLineHeight * 0.8,
-    "text-anchor": "middle",
-    "font-size": titleFontSize,
-    ...TEXT_STYLE,
-    "letter-spacing": "0.5",
-    opacity: 0.7,
-  });
-  TITLE_LINES.forEach((line, i) => {
-    const tspan = svgEl("tspan", { x: cx, dy: i === 0 ? 0 : titleLineHeight });
-    tspan.textContent = line;
-    title.appendChild(tspan);
-  });
-  g.appendChild(title);
-
-  g.appendChild(makePanelRect(x0, buttonY0, W, buttonH));
-
-  const stateLabel = svgEl("text", {
-    x: cx, y: buttonCy,
-    "text-anchor": "middle",
-    "dominant-baseline": "central",
-    "font-size": PITCH * 0.22,
-    ...TEXT_STYLE,
-  });
-  stateLabel.textContent = diagVisible ? "ON" : "OFF";
-  g.appendChild(stateLabel);
-
-  g.appendChild(makeHitRect(x0, buttonY0, W, buttonH, () => {
-    diagVisible = !diagVisible;
-    stateLabel.textContent = diagVisible ? "ON" : "OFF";
-    diagGroupEl.setAttribute("display", diagVisible ? "inline" : "none");
-  }));
-
-  return { el: g, minX: x0, minY: y0, maxX: x1, maxY: y1 };
 };
 
 // Attrs for a cell polygon at `level`: a clip-path masking it to its
@@ -704,12 +439,23 @@ const buildScene = () => {
   svg.appendChild(diagGroupEl);
   svg.appendChild(floorGroup);
 
-  const widget = buildFocusWidget(bbox.maxX, bbox.maxY);
+  const widget = buildFocusWidget(bbox.maxX, bbox.maxY, {
+    initial: focusLevel,
+    min: 1,
+    max: LEVEL_MAX,
+    onChange: (level) => { focusLevel = level; refreshFocus(); },
+  });
   svg.appendChild(widget.el);
   mergeBounds(bbox, widget);
 
   const diagToggleGap = PITCH * 0.2;
-  const diagToggle = buildDiagToggle(widget.maxX + diagToggleGap, (widget.minY + widget.maxY) / 2);
+  const diagToggle = buildDiagToggle(widget.maxX + diagToggleGap, (widget.minY + widget.maxY) / 2, {
+    initial: diagVisible,
+    onToggle: (on) => {
+      diagVisible = on;
+      diagGroupEl.setAttribute("display", diagVisible ? "inline" : "none");
+    },
+  });
   svg.appendChild(diagToggle.el);
   mergeBounds(bbox, diagToggle);
 
@@ -722,19 +468,41 @@ const buildScene = () => {
 
 buildScene();
 
-placeIcon(ICON_K_B, 5, 4, 3);
-placeIcon(ICON_K_W, 5, 6, 4);
-placeIcon(ICON_Q_B, 5, 3, 5);
-placeIcon(ICON_Q_W, 5, 2, 5);
-placeIcon(ICON_K_B, 5, 8, 5);
-placeIcon(ICON_K_W, 5, 8, 3);
-placeIcon(ICON_Q_B, 5, 5, 1);
-placeIcon(ICON_Q_W, 5, 6, 3);
-placeIcon(ICON_K_B, 5, 5, 5);
-placeIcon(ICON_K_W, 5, 6, 5);
-placeIcon(ICON_Q_B, 5, 3, 3);
-placeIcon(ICON_Q_W, 3, 3, 1);
-placeIcon(ICON_K_B, 2, 1, 4);
-placeIcon(ICON_K_W, 1, 6, 1);
-placeIcon(ICON_Q_B, 4, 5, 1);
-placeIcon(ICON_Q_W, 3, 5, 1);
+placeGamePiece('K', 'white', { level: 1, rank: 1, file: 2 });
+placeGamePiece('K', 'white', { level: 5, rank: 6, file: 4 });
+placeGamePiece('K', 'black', { level: 4, rank: 1, file: 4 });
+placeGamePiece('K', 'black', { level: 5, rank: 4, file: 3 });
+placeGamePiece('Q', 'white', { level: 3, rank: 5, file: 1 });
+placeGamePiece('Q', 'white', { level: 5, rank: 2, file: 5 });
+placeGamePiece('Q', 'black', { level: 3, rank: 2, file: 1 });
+placeGamePiece('Q', 'black', { level: 5, rank: 3, file: 5 });
+placeGamePiece('E', 'white', { level: 5, rank: 1, file: 3 });
+placeGamePiece('E', 'white', { level: 1, rank: 6, file: 1 });
+placeGamePiece('E', 'black', { level: 4, rank: 2, file: 1 });
+placeGamePiece('E', 'black', { level: 3, rank: 4, file: 1 });
+placeGamePiece('B', 'white', { level: 4, rank: 6, file: 1 });
+placeGamePiece('B', 'white', { level: 5, rank: 8, file: 3 });
+placeGamePiece('B', 'black', { level: 5, rank: 5, file: 1 });
+placeGamePiece('B', 'black', { level: 5, rank: 8, file: 5 });
+placeGamePiece('T', 'white', { level: 5, rank: 3, file: 1 });
+placeGamePiece('T', 'white', { level: 2, rank: 7, file: 1 });
+placeGamePiece('T', 'black', { level: 1, rank: 4, file: 1 });
+placeGamePiece('T', 'black', { level: 5, rank: 7, file: 3 });
+placeGamePiece('R', 'white', { level: 5, rank: 3, file: 3 });
+placeGamePiece('R', 'white', { level: 5, rank: 6, file: 5 });
+placeGamePiece('R', 'black', { level: 4, rank: 5, file: 1 });
+placeGamePiece('R', 'black', { level: 5, rank: 5, file: 5 });
+placeGamePiece('P', 'white', { level: 1, rank: 5, file: 1 });
+placeGamePiece('P', 'white', { level: 4, rank: 1, file: 3 });
+placeGamePiece('P', 'black', { level: 1, rank: 2, file: 1 });
+placeGamePiece('P', 'black', { level: 2, rank: 1, file: 4 });
+placeGamePiece('N', 'white', { level: 3, rank: 8, file: 1 });
+placeGamePiece('N', 'white', { level: 2, rank: 4, file: 1 });
+placeGamePiece('N', 'black', { level: 1, rank: 1, file: 4 });
+placeGamePiece('N', 'black', { level: 5, rank: 7, file: 1 });
+placeGamePiece('Z', 'white', { level: 3, rank: 1, file: 2 });
+placeGamePiece('Z', 'white', { level: 5, rank: 5, file: 3 });
+placeGamePiece('Z', 'black', { level: 1, rank: 8, file: 1 });
+placeGamePiece('Z', 'black', { level: 4, rank: 8, file: 1 });
+
+renderPieceIcons();
