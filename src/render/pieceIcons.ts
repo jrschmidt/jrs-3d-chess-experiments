@@ -1,3 +1,7 @@
+// SVG code for game piece icons
+
+
+// KW - White King
 const ICON_K_W = `
   <g>
     <symbol id="x-icon-k-w" viewBox="-20 -20 40 40">
@@ -15,6 +19,7 @@ const ICON_K_W = `
   </g>
 `;
 
+// KB - Black King
 const ICON_K_B = `
   <g>
     <symbol id="x-icon-k-b" viewBox="-20 -20 40 40">
@@ -32,6 +37,7 @@ const ICON_K_B = `
   </g>
 `;
 
+// QW - White Queen
 const ICON_Q_W = `
   <g>
     <symbol id="x-icon-q-w" viewBox="-20 -20 40 40">
@@ -49,6 +55,7 @@ const ICON_Q_W = `
   </g>
 `;
 
+// QB - Black Queen
 const ICON_Q_B = `
   <g>
     <symbol id="x-icon-q-b" viewBox="-20 -20 40 40">
@@ -66,6 +73,7 @@ const ICON_Q_B = `
   </g>
 `;
 
+// EW - White Eagle
 const ICON_E_W = `
   <g>
     <symbol id="x-icon-e-w" viewBox="-20 -20 40 40">
@@ -89,6 +97,7 @@ const ICON_E_W = `
   </g>
 `;
 
+// EB - Black Eagle
 const ICON_E_B = `
 <g>
   <symbol id="x-icon-e-b" viewBox="-20 -20 40 40">
@@ -112,6 +121,7 @@ const ICON_E_B = `
 </g>
 `;
 
+// RW - White Rook
 const ICON_R_W = `
   <g>
     <symbol id="x-icon-r-w" viewBox="-20 -20 40 40">
@@ -130,6 +140,7 @@ const ICON_R_W = `
   </g>
 `;
 
+// RB - Black Rook
 const ICON_R_B = `
   <g>
     <symbol id="x-icon-r-b" viewBox="-20 -20 40 40">
@@ -148,24 +159,7 @@ const ICON_R_B = `
   </g>
 `;
 
-const ICON_B_B = `
-  <g>
-    <symbol id="x-icon-b-b" viewBox="-20 -20 40 40">
-      <circle cx="0" cy="0" r="19" fill="#6f6f60" stroke="#000000" stroke-width="2" />
-    </symbol>
-    <use href="#x-icon-b-b" x="-20" y="-20" width="40" height="40" />
-    <symbol id="x-icon-b-b-overlay" viewBox="0 0 100 100">
-      <path
-        d="M 45 15 A 8 8 0 1 1 55 15 L 80 40 A 22.4 22.4 0 0 1 70 70
-          L 70 80 L 90 80 A 50 50 0 0 1 10 80 L 30 80 L 30 70
-          A 22.4 22.4 0 0 1 20 40 L 35 25 L 45 40 L 50 35 L 40 20 Z"
-        fill="#333333"
-      />
-    </symbol>
-    <use href="#x-icon-b-b-overlay" x="-19" y="-19" width="38" height="38" />
-  </g>
-`;
-
+// BW - White Bishop
 const ICON_B_W = `
   <g>
     <symbol id="x-icon-b-w" viewBox="-20 -20 40 40">
@@ -184,6 +178,26 @@ const ICON_B_W = `
   </g>
 `;
 
+// BB - Black Bishop
+const ICON_B_B = `
+  <g>
+    <symbol id="x-icon-b-b" viewBox="-20 -20 40 40">
+      <circle cx="0" cy="0" r="19" fill="#6f6f60" stroke="#000000" stroke-width="2" />
+    </symbol>
+    <use href="#x-icon-b-b" x="-20" y="-20" width="40" height="40" />
+    <symbol id="x-icon-b-b-overlay" viewBox="0 0 100 100">
+      <path
+        d="M 45 15 A 8 8 0 1 1 55 15 L 80 40 A 22.4 22.4 0 0 1 70 70
+          L 70 80 L 90 80 A 50 50 0 0 1 10 80 L 30 80 L 30 70
+          A 22.4 22.4 0 0 1 20 40 L 35 25 L 45 40 L 50 35 L 40 20 Z"
+        fill="#333333"
+      />
+    </symbol>
+    <use href="#x-icon-b-b-overlay" x="-19" y="-19" width="38" height="38" />
+  </g>
+`;
+
+// TW - White Triton
 const ICON_T_W = `
   <g>
     <symbol id="x-icon-t-w" viewBox="-20 -20 40 40">
@@ -203,6 +217,7 @@ const ICON_T_W = `
   </g>
 `;
 
+// TB - Black Triton
 const ICON_T_B = `
   <g>
     <symbol id="x-icon-t-b" viewBox="-20 -20 40 40">
@@ -222,6 +237,7 @@ const ICON_T_B = `
   </g>
 `;
 
+// NW - White Knight
 const ICON_N_W = `
   <g>
     <symbol id="x-icon-n-w" viewBox="-20 -20 40 40">
@@ -231,8 +247,8 @@ const ICON_N_W = `
     <symbol id="x-icon-n-w-overlay" viewBox="0 0 100 100">
         <path
           d="M 20 85 L 30 70 L 54 55 L 50 45 L 35 45 L 22 55
-            A 10 10 0 0 1 7 42 L 20 25 A 15 15 0 0 1 40 15
-            L 45 7 L 50 15 A 35 35 0 0 1 90 50 L 90 65 L 75 85 Z"
+            A 10 10 0 0 1 7 42 L 20 25 A 15 15 0 0 1 40 18
+            L 50 7 L 50 18 A 35 35 0 0 1 90 50 L 90 65 L 75 85 Z"
           fill="#cccccc"
         />
         <circle cx="32" cy="27" r="5" fill="#6f6f60"/>    </symbol>
@@ -240,6 +256,7 @@ const ICON_N_W = `
   </g>
 `;
 
+// NB - Black Knight
 const ICON_N_B = `
   <g>
     <symbol id="x-icon-n-b" viewBox="-20 -20 40 40">
@@ -249,8 +266,8 @@ const ICON_N_B = `
     <symbol id="x-icon-n-b-overlay" viewBox="0 0 100 100">
         <path
           d="M 20 85 L 30 70 L 54 55 L 50 45 L 35 45 L 22 55
-            A 10 10 0 0 1 7 42 L 20 25 A 15 15 0 0 1 40 15
-            L 45 7 L 50 15 A 35 35 0 0 1 90 50 L 90 65 L 75 85 Z"
+            A 10 10 0 0 1 7 42 L 20 25 A 15 15 0 0 1 40 18
+            L 50 7 L 50 18 A 35 35 0 0 1 90 50 L 90 65 L 75 85 Z"
           fill="#333333"
         />
         <circle cx="32" cy="27" r="5" fill="#6f6f60"/>    </symbol>
@@ -258,6 +275,71 @@ const ICON_N_B = `
   </g>
 `;
 
+// ZW - White Zebra
+const ICON_Z_W = `
+  <g>
+    <symbol id="x-icon-z-w" viewBox="-20 -20 40 40">
+      <circle cx="0" cy="0" r="19" fill="#6f6f60" stroke="#000000" stroke-width="2" />
+    </symbol>
+    <use href="#x-icon-z-w" x="-20" y="-20" width="40" height="40" />
+    <symbol id="x-icon-z-w-overlay" viewBox="0 0 100 100">
+      <path
+        d="M 80 85 L 25 85 L 10 65 L 10 50 A 35 35 0 0 1 50 18
+          A 6 6 0 1 1 60 18 A 15 15 0 0 1 80 25 L 93 42
+          A 10 10 0 0 1 78 55 L 65 45 L 50 45 L 46 55 L 70 70 Z"
+        fill="#cccccc"
+      />
+      <circle cx="68" cy="27" r="5" fill="#6f6f60"/>
+      <polygon
+        points="48,41 57,41 34,21 29,25"
+        fill="#6f6f60"
+      />
+      <polygon
+        points="42,56 44,50 15,43 13,50"
+        fill="#6f6f60"
+      />
+      <polygon
+        points="59,67 53,63 20,75 25,80"
+        fill="#6f6f60"
+      />
+    </symbol>
+    <use href="#x-icon-z-w-overlay" x="-19" y="-19" width="38" height="38" />
+  </g>
+`;
+
+// ZB - Black Zebra
+const ICON_Z_B = `
+  <g>
+    <symbol id="x-icon-z-b" viewBox="-20 -20 40 40">
+      <circle cx="0" cy="0" r="19" fill="#6f6f60" stroke="#000000" stroke-width="2" />
+    </symbol>
+    <use href="#x-icon-z-b" x="-20" y="-20" width="40" height="40" />
+    <symbol id="x-icon-z-b-overlay" viewBox="0 0 100 100">
+      <path
+        d="M 80 85 L 25 85 L 10 65 L 10 50 A 35 35 0 0 1 50 18
+          A 6 6 0 1 1 60 18 A 15 15 0 0 1 80 25 L 93 42
+          A 10 10 0 0 1 78 55 L 65 45 L 50 45 L 46 55 L 70 70 Z"
+        fill="#333333"
+      />
+      <circle cx="68" cy="27" r="5" fill="#6f6f60"/>
+      <polygon
+        points="48,41 57,41 34,21 29,25"
+        fill="#6f6f60"
+      />
+      <polygon
+        points="42,56 44,50 15,43 13,50"
+        fill="#6f6f60"
+      />
+      <polygon
+        points="59,67 53,63 20,75 25,80"
+        fill="#6f6f60"
+      />
+    </symbol>
+    <use href="#x-icon-z-b-overlay" x="-19" y="-19" width="38" height="38" />
+  </g>
+`;
+
+// PW - White Pawn
 const ICON_P_W = `
   <g>
     <symbol id="x-icon-p-w" viewBox="-20 -20 40 40">
@@ -276,6 +358,7 @@ const ICON_P_W = `
   </g>
 `;
 
+// Black Pawn
 const ICON_P_B = `
   <g>
     <symbol id="x-icon-p-b" viewBox="-20 -20 40 40">
@@ -309,6 +392,8 @@ export const PIECE_ICONS = {
   tb: ICON_T_B,
   nw: ICON_N_W,
   nb: ICON_N_B,
+  zw: ICON_Z_W,
+  zb: ICON_Z_B,
   pw: ICON_P_W,
   pb: ICON_P_B,
 } as const;

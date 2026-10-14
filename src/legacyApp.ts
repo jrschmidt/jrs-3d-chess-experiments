@@ -659,5 +659,9 @@ placeGamePiece('N', 'white', { level: 3, rank: 8, file: 1 });
 placeGamePiece('N', 'white', { level: 2, rank: 4, file: 1 });
 placeGamePiece('N', 'black', { level: 1, rank: 1, file: 4 });
 placeGamePiece('N', 'black', { level: 5, rank: 7, file: 1 });
+placeGamePiece('Z', 'white', { level: 3, rank: 1, file: 2 });
+placeGamePiece('Z', 'white', { level: 5, rank: 5, file: 3 });
+placeGamePiece('Z', 'black', { level: 1, rank: 8, file: 1 });
+placeGamePiece('Z', 'black', { level: 4, rank: 8, file: 1 });
 
 renderPieceIcons();
