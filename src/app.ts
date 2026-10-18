@@ -3,8 +3,8 @@ import { PIECE_ICONS } from './render/pieceIcons.ts';
 import { placeGamePiece, getBoardPositions } from './state/gameState.ts';
 import { LEVEL_MAX, RANK_MAX, FILE_MAX, PITCH } from './render/constants.ts';
 import { SVG_NS, svgEl } from './render/svg.ts';
-import { buildFocusWidget } from './ui/focusWidget.ts';
-import { buildDiagToggle } from './ui/diagToggle.ts';
+import { buildFocusWidget } from './widgets/focusWidget.ts';
+import { buildDiagToggle } from './widgets/diagToggle.ts';
 
 
 // Cell coordinates (rank, level, file) are defined in render/constants.ts.
