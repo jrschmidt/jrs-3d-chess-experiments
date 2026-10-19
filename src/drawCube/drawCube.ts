@@ -326,57 +326,71 @@ const addEdgeLine = (group, bottom, top, bbox) => {
   extendBounds(bbox, [bottom, top]);
 };
 
-export const buildScene = () => {
-  const svg = document.getElementById("scene");
+// Calls fn(rank, level, file) once for every cell in the cube.
+const forEachCell = (fn) => {
+  for (let level = 1; level <= LEVEL_MAX; level++) {
+    for (let rank = 1; rank <= RANK_MAX; rank++) {
+      for (let file = 1; file <= FILE_MAX; file++) {
+        fn(rank, level, file);
+      }
+    }
+  }
+};
+
+// One clipPath per non-top level, masking a cell to just its visible
+// (chevron-shaped) portion of that level's floor.
+const buildClipDefs = () => {
   const defs = svgEl("defs", {});
-  const checkerGroup = svgEl("g", { id: "checkers" });
-  diagGroupEl = svgEl("g", { id: "diag-squares", display: diagVisible ? "inline" : "none" });
-  const floorGroup = svgEl("g", { id: "floors" });
-  checkerPolys = [];
-  floorPolys = [];
-  verticalHighlightEls = [];
-
-  const bbox = { minX: Infinity, minY: Infinity, maxX: -Infinity, maxY: -Infinity };
-
-  // One clipPath per non-top level, masking a cell to just its visible
-  // (chevron-shaped) portion of that level's floor.
   for (let level = 1; level < LEVEL_MAX; level++) {
     const clipPath = svgEl("clipPath", { id: `visible-clip-${level}` });
     clipPath.appendChild(svgEl("polygon", { points: pointsAttr(chevronPoints(level)) }));
     defs.appendChild(clipPath);
   }
+  return defs;
+};
 
-  for (let level = 1; level <= LEVEL_MAX; level++) {
-    for (let rank = 1; rank <= RANK_MAX; rank++) {
-      for (let file = 1; file <= FILE_MAX; file++) {
-        const corners = cellFootprint(rank, level, file);
-        const variant = isDarkCell(rank, level, file) ? "dark" : "light";
-        const pts = pointsAttr(corners);
+// The checkerboard floor of every cell, recorded in checkerPolys so
+// refreshFocus can recolor it when the focus level changes.
+const buildCheckers = (bbox) => {
+  const checkerGroup = svgEl("g", { id: "checkers" });
+  forEachCell((rank, level, file) => {
+    const corners = cellFootprint(rank, level, file);
+    const variant = isDarkCell(rank, level, file) ? "dark" : "light";
+    const poly = svgEl("polygon", {
+      points: pointsAttr(corners),
+      fill: checkerColor(level, variant, focusLevel),
+      stroke: "none",
+      ...clipAttrsForLevel(level),
+    });
+    checkerPolys.push({ el: poly, level, variant });
+    checkerGroup.appendChild(poly);
+    extendBounds(bbox, corners);
+  });
+  return checkerGroup;
+};
 
-        const poly = svgEl("polygon", {
-          points: pts,
-          fill: checkerColor(level, variant, focusLevel),
-          stroke: "none",
-          ...clipAttrsForLevel(level),
-        });
-        checkerPolys.push({ el: poly, level, variant });
-        checkerGroup.appendChild(poly);
+// The diagonal-square overlay: one inset outline per cell, colored by its
+// diagonal set. Inset inside each cell, so it never extends the bbox.
+const buildDiagSquares = () => {
+  diagGroupEl = svgEl("g", { id: "diag-squares", display: diagVisible ? "inline" : "none" });
+  forEachCell((rank, level, file) => {
+    const diagId = diagForCell(rank, level, file);
+    const diagCorners = cellFootprintInset(rank, level, file, DIAG_SQUARE_MARGIN);
+    diagGroupEl.appendChild(svgEl("polygon", {
+      points: pointsAttr(diagCorners),
+      fill: "none",
+      stroke: DIAG_COLORS[diagId],
+      "stroke-width": DIAG_SQUARE_STROKE_WIDTH,
+      ...clipAttrsForLevel(level),
+    }));
+  });
+  return diagGroupEl;
+};
 
-        extendBounds(bbox, corners);
-
-        const diagId = diagForCell(rank, level, file);
-        const diagCorners = cellFootprintInset(rank, level, file, DIAG_SQUARE_MARGIN);
-        const diagSquare = svgEl("polygon", {
-          points: pointsAttr(diagCorners),
-          fill: "none",
-          stroke: DIAG_COLORS[diagId],
-          "stroke-width": DIAG_SQUARE_STROKE_WIDTH,
-          ...clipAttrsForLevel(level),
-        });
-        diagGroupEl.appendChild(diagSquare);
-      }
-    }
-  }
+// The cube's wireframe: floor perimeters, vertical edges, ceiling, and the
+// focused level's vertical highlight overlays.
+const buildFrame = (bbox) => {
+  const floorGroup = svgEl("g", { id: "floors" });
 
   for (let level = 1; level <= LEVEL_MAX; level++) {
     const corners = floorPerimeter(level);
@@ -434,11 +448,12 @@ export const buildScene = () => {
   }
   updateVerticalHighlights(focusLevel);
 
-  svg.appendChild(defs);
-  svg.appendChild(checkerGroup);
-  svg.appendChild(diagGroupEl);
-  svg.appendChild(floorGroup);
+  return floorGroup;
+};
 
+// The focus-level widget and diagonal toggle, anchored at the cube's
+// bottom-right corner — so bbox must already cover the whole cube.
+const buildControls = (svg, bbox) => {
   const widget = buildFocusWidget(bbox.maxX, bbox.maxY, {
     initial: focusLevel,
     min: 1,
@@ -458,10 +473,30 @@ export const buildScene = () => {
   });
   svg.appendChild(diagToggle.el);
   mergeBounds(bbox, diagToggle);
+};
 
+const fitViewBox = (svg, bbox) => {
   const pad = PITCH * 0.6;
   const vbX = bbox.minX - pad, vbY = bbox.minY - pad;
   const vbW = (bbox.maxX - bbox.minX) + pad * 2, vbH = (bbox.maxY - bbox.minY) + pad * 2;
   svg.setAttribute("viewBox", `${vbX} ${vbY} ${vbW} ${vbH}`);
   svg.setAttribute("preserveAspectRatio", "xMidYMid meet");
+};
+
+export const buildScene = () => {
+  const svg = document.getElementById("scene");
+  checkerPolys = [];
+  floorPolys = [];
+  verticalHighlightEls = [];
+
+  const bbox = { minX: Infinity, minY: Infinity, maxX: -Infinity, maxY: -Infinity };
+
+  // Append order is paint order: checkers under diag squares under the frame.
+  svg.appendChild(buildClipDefs());
+  svg.appendChild(buildCheckers(bbox));
+  svg.appendChild(buildDiagSquares());
+  svg.appendChild(buildFrame(bbox));
+
+  buildControls(svg, bbox);
+  fitViewBox(svg, bbox);
 };
