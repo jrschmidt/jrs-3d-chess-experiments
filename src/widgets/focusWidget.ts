@@ -1,6 +1,6 @@
 // @ts-nocheck
-import { PITCH } from '../Display/render/constants.ts';
-import { svgEl } from '../Display/render/svg.ts';
+import { PITCH } from '../display/render/constants.ts';
+import { svgEl } from '../display/render/svg.ts';
 import { TEXT_STYLE, makePanelRect, makeHitRect } from './widgetChrome.ts';
 
 // Small widget for choosing the focus level: a numeral, an up/down arrow
