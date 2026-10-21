@@ -5,6 +5,7 @@ import { LEVEL_MAX, RANK_MAX, FILE_MAX, PITCH } from '../render/constants.ts';
 import { SVG_NS, svgEl } from '../render/svg.ts';
 import { buildFocusWidget } from '../../widgets/focusWidget.ts';
 import { buildDiagToggle } from '../../widgets/diagToggle.ts';
+import { buildViewOption } from '../../widgets/viewOption.ts';
 
 
 // Cell coordinates (rank, level, file) are defined in render/constants.ts.
@@ -33,6 +34,19 @@ let focusLevel = 1;
 
 // Whether the diagonal-square overlay is shown at all; off by default.
 let diagVisible = false;
+
+// The camera view chosen in the view-option widget. Only "cube" is
+// implemented; the others just report themselves as not implemented.
+let currentView = "cube";
+
+// Updates the caption's red view label, and the "not implemented" note
+// shown beneath it for any view other than the cube view.
+const showViewStatus = (id, label) => {
+  document.getElementById("view-label").textContent = label;
+  const note = document.getElementById("view-note");
+  note.textContent = `${label} not implemented`;
+  note.hidden = id === "cube";
+};
 
 const checkerColor = (level, variant, focus) =>
   CHECKER_COLORS[level === focus ? "focus" : "unfocused"][variant];
@@ -453,7 +467,8 @@ const buildFrame = (bbox) => {
 };
 
 // The focus-level widget and diagonal toggle, anchored at the cube's
-// bottom-right corner — so bbox must already cover the whole cube.
+// bottom-right corner — so bbox must already cover the whole cube — plus
+// the view selector at the cube's left.
 const buildControls = (svg, bbox) => {
   const widget = buildFocusWidget(bbox.maxX, bbox.maxY, {
     initial: focusLevel,
@@ -474,6 +489,39 @@ const buildControls = (svg, bbox) => {
   });
   svg.appendChild(diagToggle.el);
   mergeBounds(bbox, diagToggle);
+
+  // The view selector sits left of the cube, its bottom level with the
+  // bottom of the back-left vertical edge (the cube's leftmost point). It's
+  // built just left of the cube so the viewBox reserves room for it, then
+  // centerViewOption slides it to its final spot once the viewBox is set.
+  const backLeft = perimeterCorners(1, -1).backLeft;
+  const viewOption = buildViewOption(backLeft.x - PITCH * 0.4, backLeft.y, {
+    initial: currentView,
+    onChange: (id, label) => {
+      currentView = id;
+      showViewStatus(id, label);
+    },
+  });
+  svg.appendChild(viewOption.el);
+  mergeBounds(bbox, viewOption);
+  viewOptionEl = viewOption;
+};
+
+// Populated by buildControls; used by centerViewOption.
+let viewOptionEl = null;
+
+// Shifts the view selector so it's centered horizontally midway between
+// the left edge of the display and the cube's leftmost point. The display's
+// left edge in scene units depends on the window's aspect ratio (the
+// viewBox is letterboxed with "meet"), so this reruns on every resize.
+const centerViewOption = (svg) => {
+  const pt = svg.createSVGPoint();
+  pt.x = svg.getBoundingClientRect().left; pt.y = 0;
+  const displayLeftX = pt.matrixTransform(svg.getScreenCTM().inverse()).x;
+  const cubeLeftX = perimeterCorners(1, -1).backLeft.x;
+  const targetCenterX = (displayLeftX + cubeLeftX) / 2;
+  const builtCenterX = (viewOptionEl.minX + viewOptionEl.maxX) / 2;
+  viewOptionEl.el.setAttribute("transform", `translate(${(targetCenterX - builtCenterX).toFixed(2)}, 0)`);
 };
 
 const fitViewBox = (svg, bbox) => {
@@ -500,4 +548,7 @@ export const buildScene = () => {
 
   buildControls(svg, bbox);
   fitViewBox(svg, bbox);
+
+  centerViewOption(svg);
+  window.addEventListener("resize", () => centerViewOption(svg));
 };

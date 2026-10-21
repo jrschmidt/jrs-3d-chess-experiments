@@ -1,38 +1,44 @@
 ---
 name: run-clc-26-004
-description: Build, run, and drive the clc-26-004 "5x5x8 Cube" isometric SVG visualization (index.html + app.js, no build step). Use when asked to start, serve, run, screenshot, or interact with this app, or to verify a change to app.js/index.html actually renders.
+description: Build, run, and drive the x3d-chess app (formerly clc-26-004, the "5x5x8 Cube" isometric SVG visualization; Vite + TypeScript, sources under src/). Use when asked to start, serve, run, screenshot, or interact with this app, or to verify a change to src/ or index.html actually renders.
 ---
 
-This is a plain static site (`index.html` loads `app.js`, no build step, no
-`package.json` for the app itself). Drive it with the Playwright driver at
-`.claude/skills/run-clc-26-004/driver.mjs` — it serves the site, launches
-headless Chromium, screenshots the scene, clicks the focus-level widget, and
-reports console errors. All paths below are relative to the repo root
-(`clc-26-004/`).
+The app is a Vite + TypeScript project: `index.html` loads `src/main.ts`,
+which imports `src/app.ts` (scene in `src/display/`, widgets in
+`src/widgets/`, game state in `src/gameState/`). Drive it with the
+Playwright driver at `.claude/skills/run-clc-26-004/driver.mjs` — it starts
+the Vite dev server, launches headless Chromium, screenshots the scene,
+exercises each widget, and reports console errors. All paths below are
+relative to the repo root (`x3d-chess/`).
 
 ## Prerequisites
 
-Node.js and `python3` (used only as a static file server — any static server
-works, but the driver shells out to `python3 -m http.server`). Both were
-already present in this container; nothing extra needed via `apt-get`.
+Node.js. Install the app's dependencies (Vite, TypeScript) at the repo root
+once:
 
-## Setup
+```bash
+npm install
+```
 
 The driver has its own `package.json` (Playwright) scoped inside the skill
-directory, kept separate from the app so the app itself stays dependency-free.
-Install once:
+directory, kept separate from the app's. Install once:
 
 ```bash
 cd .claude/skills/run-clc-26-004 && npm install
 ```
 
-Playwright's Chromium binary was already cached at
-`~/Library/Caches/ms-playwright` in this container; if it's missing, run
-`npx playwright install chromium` after `npm install`.
+If Playwright's Chromium isn't cached (`~/Library/Caches/ms-playwright`),
+run `npx playwright install chromium` from the skill directory.
 
 ## Build
 
-No build step — `index.html` and `app.js` are served as-is.
+```bash
+npm run build   # tsc && vite build -> dist/
+```
+
+`tsc` is strict about unused declarations (TS6133), so a build can fail on
+code unrelated to the change being checked. The dev server (below) does not
+type-check, so the driver still runs in that case.
 
 ## Run (agent path)
 
@@ -40,47 +46,53 @@ No build step — `index.html` and `app.js` are served as-is.
 node .claude/skills/run-clc-26-004/driver.mjs [outDir]
 ```
 
-Run from the repo root (or anywhere — paths inside the driver are resolved
-relative to the driver script itself, not the CWD). It:
+Paths inside the driver are resolved relative to the driver script, not the
+CWD. It:
 
-1. Starts `python3 -m http.server 8123` at the repo root and polls until
-   `http://localhost:8123/index.html` responds.
-2. Launches headless Chromium, navigates, waits for `#scene polygon` to
-   exist, and screenshots to `<outDir>/screenshot.png`.
-3. Clicks the focus-level widget's up arrow (the first
-   `#focus-widget rect[style*="cursor: pointer"]`) and confirms the LEVEL
-   numeral advances (e.g. `1 -> 2`), then takes a second screenshot,
-   `<outDir>/screenshot-level2.png`.
-4. Prints the distinct `(r,g,b)` stroke colors found on `#diag-squares
-   polygon` elements — useful for confirming diagonal-marking colors after a
-   change to `DIAG_COLORS` in `app.js`.
-5. Prints any browser console/page errors and exits non-zero if there were
-   any, or if the focus-level click didn't change the numeral.
-6. Kills its own server on exit (success, failure, or Ctrl-C).
+1. Starts `node_modules/.bin/vite --port 8123 --strictPort` at the repo root
+   and polls until `http://localhost:8123/` responds.
+2. Launches headless Chromium, waits for `#checkers polygon`, and
+   screenshots to `<outDir>/screenshot.png`.
+3. Clicks the focus-level widget's up arrow and confirms the LEVEL numeral
+   advances (`1 -> 2`); screenshots `screenshot-level2.png`.
+4. Confirms the diagonal overlay (`#diag-squares`) starts hidden, clicks the
+   diag toggle, confirms it shows, and prints its distinct stroke colors;
+   screenshots `screenshot-diag-on.png`.
+5. Clicks "Front View" in the view-option widget and confirms the caption's
+   red `#view-label` reads "Front View" and `#view-note` reads "Front View
+   not implemented"; screenshots `screenshot-front-view.png`. Then clicks
+   "Cube View" and confirms the note hides again.
+6. Prints any browser console/page errors and exits non-zero if there were
+   any, or if any check above failed.
+7. Kills its own server on exit (success, failure, or Ctrl-C).
 
-`outDir` defaults to the skill directory itself
-(`.claude/skills/run-clc-26-004/`); pass a path to write screenshots
+`outDir` defaults to the skill directory itself (screenshots there are
+gitignored); pass a path — e.g. the session scratchpad — to write them
 elsewhere.
 
-Sample output from a real run in this container:
+Sample output from a real run:
 
 ```
-screenshot: .../screenshot.png
 focus level: 1 -> 2
-screenshot: .../screenshot-level2.png
-diag square colors (r,g,b): 51,51,204 | 204,51,204 | 51,204,51 | 204,102,51
+diag overlay display (before toggle): none
+diag overlay display (after toggle): inline
+diag square colors (hex): #1953ff | #b300b3 | #b34100 | #178217
+view label: Cube View -> Front View; note: Front View not implemented
+view label after re-selecting cube: Cube View; note visible: false
 no console errors
 ```
+
+(`screenshot: ...` lines omitted.) When adding a new widget, add a matching
+check to the driver.
 
 ## Run (human path)
 
 ```bash
-python3 -m http.server 8123   # from repo root
+npm run dev
 ```
 
-Then open `http://localhost:8123/index.html` in a browser. `Ctrl-C` to stop.
-Only useful for a human with a display — the agent path above is what to use
-in a headless container.
+Then open the URL Vite prints (default `http://localhost:5173/`). Vite
+hot-reloads on save. `Ctrl-C` to stop.
 
 ## Test
 
@@ -90,28 +102,31 @@ No test suite exists in this repo.
 
 ## Gotchas
 
-- **The focus-level up/down hit-targets have no id/class.** They're
-  `<rect>` elements with `fill: rgba(255,255,255,0.001)` (nearly invisible,
-  intentionally) and `style="cursor: pointer"` — that inline style is the
-  only reliable selector. The "up" button is the first match inside
-  `#focus-widget`, "down" the second (`buildFocusWidget` in `app.js` wires
-  up before down).
-- **Don't `npm install` at the repo root.** The app itself has no
-  `package.json` and is meant to stay dependency-free; the driver's
-  `package.json`/`node_modules` are scoped inside the skill directory on
-  purpose (both are gitignored) and resolve fine regardless of the caller's
-  CWD, since Node resolves `require`/`import` relative to the requiring
-  file's directory, not the process CWD.
-- **Port 8123 can be left occupied by a previous killed run.** The driver
-  kills its own child server on exit (including SIGINT), but if a stray
-  server is already bound, free it first: `lsof -ti:8123 -sTCP:LISTEN |
-  xargs -r kill`.
+- **Widget hit-targets have no id/class.** They're `<rect>` elements with
+  `fill: rgba(255,255,255,0.001)` (nearly invisible, intentionally) and
+  `style="cursor: pointer"` — that inline style is the only reliable
+  selector, scoped by the widget's group id:
+  - `#focus-widget`: first match is "up", second is "down".
+  - `#diag-toggle`: a single match.
+  - `#view-option`: one per row, in order Cube, Front, Top, Side.
+- **The caption is HTML, not SVG.** `#caption` in `index.html` holds the
+  static text plus `#view-label` and `#view-note` (toggled via the `hidden`
+  attribute), so check visibility with `page.isVisible`, not an SVG
+  `display` attribute.
+- **Spawn the vite binary directly, not `npx vite`/`npm run dev`.** The
+  driver kills its child on exit; with an npm/npx wrapper in between, the
+  actual server can survive and keep the port.
+- **Port 8123 can be left occupied by a previous killed run.** If a stray
+  server is bound, `--strictPort` makes Vite fail rather than pick another
+  port. Free it first: `lsof -ti:8123 -sTCP:LISTEN | xargs -r kill`.
 
 ## Troubleshooting
 
 - **`Error: browserType.launch: Executable doesn't exist ...`**: Playwright's
   Chromium isn't downloaded. Run `npx playwright install chromium` from
   `.claude/skills/run-clc-26-004/`.
-- **Driver hangs at "server did not come up"**: something else is already
-  listening on port 8123 but not serving `index.html` (e.g. a different
-  app). Free the port (see Gotchas) and rerun.
+- **`spawn .../node_modules/.bin/vite ENOENT`**: the app's dependencies
+  aren't installed; run `npm install` at the repo root.
+- **Driver hangs at "server did not come up"**: port 8123 is taken (see
+  Gotchas) or Vite failed to start; run `npx vite --port 8123 --strictPort`
+  by hand to see its error.

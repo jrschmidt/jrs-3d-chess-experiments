@@ -1,14 +1,15 @@
 #!/usr/bin/env node
-// Driver for clc-26-004 (the "5x5x8 Cube" isometric SVG visualization):
-// serves the static site, drives it with Playwright/Chromium, takes a
-// screenshot, exercises the focus-level widget, and reports console errors.
+// Driver for x3d-chess (formerly clc-26-004, the "5x5x8 Cube" isometric SVG
+// visualization): starts the Vite dev server, drives the app with
+// Playwright/Chromium, takes screenshots, exercises the focus-level, diagonal
+// toggle and view-option widgets, and reports console errors.
 //
 // Usage:
 //   node .claude/skills/run-clc-26-004/driver.mjs [outDir]
 //
 // outDir defaults to this skill directory. Writes screenshot.png there.
-// Exits non-zero (and prints why) if the page throws a console error or the
-// focus-level interaction doesn't change the numeral.
+// Exits non-zero (and prints why) if the page throws a console error or any
+// widget interaction doesn't have its expected effect.
 
 import { chromium } from "playwright";
 import { spawn } from "node:child_process";
@@ -19,7 +20,7 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const repoRoot = path.resolve(__dirname, "../../.."); // .claude/skills/run-clc-26-004 -> repo root
 const outDir = process.argv[2] ? path.resolve(process.argv[2]) : __dirname;
 const PORT = 8123;
-const BASE_URL = `http://localhost:${PORT}/index.html`;
+const BASE_URL = `http://localhost:${PORT}/`;
 
 const waitForServer = async (url, timeoutMs = 15000) => {
   const start = Date.now();
@@ -35,7 +36,9 @@ const waitForServer = async (url, timeoutMs = 15000) => {
   throw new Error(`server did not come up at ${url} within ${timeoutMs}ms`);
 };
 
-const server = spawn("python3", ["-m", "http.server", String(PORT)], {
+// Run the repo's own vite binary directly (not via npx/npm) so that
+// server.kill() reaches the server process itself.
+const server = spawn(path.join(repoRoot, "node_modules/.bin/vite"), ["--port", String(PORT), "--strictPort"], {
   cwd: repoRoot,
   stdio: "ignore",
 });
@@ -65,7 +68,7 @@ try {
   // confirm the LEVEL numeral advances (1 -> 2). The two hit-target rects
   // inside #focus-widget are the only elements with a `cursor: pointer`
   // style; the first is "up", the second is "down" (see buildFocusWidget in
-  // app.js — up is wired before down).
+  // src/widgets/focusWidget.ts — up is wired before down).
   const numeral = page.locator('#focus-widget text[dominant-baseline="central"]');
   const before = await numeral.textContent();
   await page.locator('#focus-widget rect[style*="cursor: pointer"]').first().click();
@@ -81,7 +84,7 @@ try {
 
   // The diag-square overlay defaults to off; confirm that, then toggle it on
   // via the diag-toggle widget's single click target (see buildDiagToggle in
-  // app.js) and confirm squares appear.
+  // src/widgets/diagToggle.ts) and confirm squares appear.
   const sampleDiagColors = () => page.$$eval("#diag-squares polygon", (els) => {
     const set = new Set();
     for (const el of els) {
@@ -110,6 +113,32 @@ try {
 
   await page.screenshot({ path: path.join(outDir, "screenshot-diag-on.png") });
   console.log(`screenshot: ${path.join(outDir, "screenshot-diag-on.png")}`);
+
+  // The view-option widget has one click target per row, in order Cube,
+  // Front, Top, Side (see buildViewOption in src/widgets/viewOption.ts).
+  // Picking Front should relabel the caption's red #view-label and reveal
+  // the "not implemented" #view-note; picking Cube again should hide it.
+  const viewRows = page.locator('#view-option rect[style*="cursor: pointer"]');
+  const viewLabelBefore = await page.textContent("#view-label");
+  await viewRows.nth(1).click();
+  const viewLabelFront = await page.textContent("#view-label");
+  const viewNoteFront = (await page.isVisible("#view-note")) ? await page.textContent("#view-note") : "(hidden)";
+  console.log(`view label: ${viewLabelBefore} -> ${viewLabelFront}; note: ${viewNoteFront}`);
+  if (viewLabelBefore !== "Cube View" || viewLabelFront !== "Front View" || viewNoteFront !== "Front View not implemented") {
+    console.error("FAIL: selecting Front View did not update the caption as expected");
+    exitCode = 1;
+  }
+
+  await page.screenshot({ path: path.join(outDir, "screenshot-front-view.png") });
+  console.log(`screenshot: ${path.join(outDir, "screenshot-front-view.png")}`);
+
+  await viewRows.nth(0).click();
+  const viewNoteCubeVisible = await page.isVisible("#view-note");
+  console.log(`view label after re-selecting cube: ${await page.textContent("#view-label")}; note visible: ${viewNoteCubeVisible}`);
+  if (viewNoteCubeVisible) {
+    console.error("FAIL: re-selecting Cube View did not hide the not-implemented note");
+    exitCode = 1;
+  }
 
   if (consoleErrors.length) {
     console.error("FAIL: console errors:", JSON.stringify(consoleErrors));
