@@ -1,6 +1,6 @@
 // @ts-nocheck
 import { PIECE_ICONS } from '../render/pieceIcons.ts';
-import { getBoardPositions } from '../../gameState/gameState.ts';
+import { piecesInDrawOrder } from '../drawOrder.ts';
 import { LEVEL_MAX, RANK_MAX, FILE_MAX, PITCH } from '../render/constants.ts';
 import { SVG_NS, svgEl } from '../render/svg.ts';
 import { buildFocusWidget } from '../../widgets/focusWidget.ts';
@@ -232,9 +232,10 @@ const renderPieceIcon = (type, color, location) => {
   return g;
 };
 
-// Draws every piece currently in the game state's board positions.
-export const renderPieceIcons = () => {
-  for (const piece of getBoardPositions()) {
+// Draws every piece on the board, back to front for the given view (see
+// drawOrder.ts) so nearer icons paint over farther ones.
+export const renderPieceIcons = (view = 'cube-view') => {
+  for (const piece of piecesInDrawOrder(view)) {
     renderPieceIcon(piece.type, piece.color, piece.location);
   }
 };

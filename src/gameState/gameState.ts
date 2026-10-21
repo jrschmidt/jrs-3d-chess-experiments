@@ -17,20 +17,35 @@ export type GameboardState = ChessPiece[];
 
 const boardPositions: GameboardState = [];
 
+// Index of occupied cells, keyed by cellKey(location); kept in sync with
+// boardPositions by placeGamePiece / removeGamePiece / resetGameState.
+const piecesByCell = new Map<string, ChessPiece>();
+
+const cellKey = ({ level, rank, file }: Location): string => `${level},${rank},${file}`;
+
 export const resetGameState = (): void => {
   boardPositions.length = 0;
+  piecesByCell.clear();
 };
 
 export const placeGamePiece = (type: PieceType, color: PieceColor, location: Location): void => {
-  boardPositions.push({ type, color, location });
+  const piece: ChessPiece = { type, color, location };
+  boardPositions.push(piece);
+  piecesByCell.set(cellKey(location), piece);
 };
 
 export const removeGamePiece = (piece: ChessPiece): void => {
   const idx = boardPositions.indexOf(piece);
   if (idx !== -1) boardPositions.splice(idx, 1);
+  if (piece.location && piecesByCell.get(cellKey(piece.location)) === piece) {
+    piecesByCell.delete(cellKey(piece.location));
+  }
 };
 
 export const getBoardPositions = (): Readonly<GameboardState> => boardPositions;
+
+export const pieceAt = (location: Location): ChessPiece | undefined =>
+  piecesByCell.get(cellKey(location));
 
 const buildExample1 = (): void => {
   placeGamePiece('K', 'white', { level: 1, rank: 1, file: 2 });
