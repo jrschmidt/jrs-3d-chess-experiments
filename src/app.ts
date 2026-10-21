@@ -1,6 +1,6 @@
 // @ts-nocheck
-import { placeGamePiece } from './state/gameState.ts';
-import { buildScene, renderPieceIcons } from './drawCube/drawCube.ts';
+import { placeGamePiece } from './gameState/gameState.ts';
+import { buildScene, renderPieceIcons } from './Display/drawCube/drawCube.ts';
 
 buildScene();
 
