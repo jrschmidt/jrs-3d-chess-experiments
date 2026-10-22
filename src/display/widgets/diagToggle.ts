@@ -1,6 +1,6 @@
 // @ts-nocheck
-import { PITCH } from '../display/render/constants.ts';
-import { svgEl } from '../display/render/svg.ts';
+import { PITCH } from '../render/constants.ts';
+import { svgEl } from '../render/svg.ts';
 import { TEXT_STYLE, makePanelRect, makeHitRect } from './widgetChrome.ts';
 
 // Binary on/off control for the diagonal-square overlay, anchored so its

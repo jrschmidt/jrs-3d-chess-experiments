@@ -1,5 +1,5 @@
 // @ts-nocheck
-import { svgEl } from '../display/render/svg.ts';
+import { svgEl } from '../render/svg.ts';
 
 // --- Widget chrome helpers (shared by buildFocusWidget/buildDiagToggle) ---
 export const TEXT_STYLE = { "font-family": "system-ui, sans-serif", fill: "#cdd3de" };

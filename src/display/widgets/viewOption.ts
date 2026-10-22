@@ -1,6 +1,6 @@
 // @ts-nocheck
-import { PITCH } from '../display/render/constants.ts';
-import { svgEl } from '../display/render/svg.ts';
+import { PITCH } from '../render/constants.ts';
+import { svgEl } from '../render/svg.ts';
 import { TEXT_STYLE, makePanelRect, makeHitRect } from './widgetChrome.ts';
 
 // Selector for the camera view: four options stacked vertically, anchored

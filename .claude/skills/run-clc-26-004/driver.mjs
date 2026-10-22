@@ -68,7 +68,7 @@ try {
   // confirm the LEVEL numeral advances (1 -> 2). The two hit-target rects
   // inside #focus-widget are the only elements with a `cursor: pointer`
   // style; the first is "up", the second is "down" (see buildFocusWidget in
-  // src/widgets/focusWidget.ts — up is wired before down).
+  // src/display/widgets/focusWidget.ts — up is wired before down).
   const numeral = page.locator('#focus-widget text[dominant-baseline="central"]');
   const before = await numeral.textContent();
   await page.locator('#focus-widget rect[style*="cursor: pointer"]').first().click();
@@ -84,7 +84,7 @@ try {
 
   // The diag-square overlay defaults to off; confirm that, then toggle it on
   // via the diag-toggle widget's single click target (see buildDiagToggle in
-  // src/widgets/diagToggle.ts) and confirm squares appear.
+  // src/display/widgets/diagToggle.ts) and confirm squares appear.
   const sampleDiagColors = () => page.$$eval("#diag-squares polygon", (els) => {
     const set = new Set();
     for (const el of els) {
@@ -115,7 +115,7 @@ try {
   console.log(`screenshot: ${path.join(outDir, "screenshot-diag-on.png")}`);
 
   // The view-option widget has one click target per row, in order Cube,
-  // Front, Top, Side (see buildViewOption in src/widgets/viewOption.ts).
+  // Front, Top, Side (see buildViewOption in src/display/widgets/viewOption.ts).
   // Picking Front should relabel the caption's red #view-label and reveal
   // the "not implemented" #view-note; picking Cube again should hide it.
   const viewRows = page.locator('#view-option rect[style*="cursor: pointer"]');

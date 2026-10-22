@@ -5,7 +5,7 @@ description: Build, run, and drive the x3d-chess app (formerly clc-26-004, the "
 
 The app is a Vite + TypeScript project: `index.html` loads `src/main.ts`,
 which imports `src/app.ts` (scene in `src/display/`, widgets in
-`src/widgets/`, game state in `src/gameState/`). Drive it with the
+`src/display/widgets/`, game state in `src/gameState/`). Drive it with the
 Playwright driver at `.claude/skills/run-clc-26-004/driver.mjs` — it starts
 the Vite dev server, launches headless Chromium, screenshots the scene,
 exercises each widget, and reports console errors. All paths below are

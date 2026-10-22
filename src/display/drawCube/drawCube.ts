@@ -3,9 +3,9 @@ import { PIECE_ICONS } from '../render/pieceIcons.ts';
 import { piecesInDrawOrder } from '../drawOrder.ts';
 import { LEVEL_MAX, RANK_MAX, FILE_MAX, PITCH } from '../render/constants.ts';
 import { SVG_NS, svgEl } from '../render/svg.ts';
-import { buildFocusWidget } from '../../widgets/focusWidget.ts';
-import { buildDiagToggle } from '../../widgets/diagToggle.ts';
-import { buildViewOption } from '../../widgets/viewOption.ts';
+import { buildFocusWidget } from '../widgets/focusWidget.ts';
+import { buildDiagToggle } from '../widgets/diagToggle.ts';
+import { buildViewOption } from '../widgets/viewOption.ts';
 
 
 // Cell coordinates (rank, level, file) are defined in render/constants.ts.
