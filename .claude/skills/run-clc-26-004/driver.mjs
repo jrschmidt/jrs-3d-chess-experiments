@@ -116,16 +116,34 @@ try {
 
   // The view-option widget has one click target per row, in order Cube,
   // Front, Top, Side (see buildViewOption in src/display/widgets/viewOption.ts).
-  // Picking Front should relabel the caption's red #view-label and reveal
-  // the "not implemented" #view-note; picking Cube again should hide it.
+  // Picking Front should relabel the caption's red #view-label, hide the
+  // #cube group, and show the #not-implemented placeholder — without moving
+  // any widget. Picking Cube again should restore the cube.
   const viewRows = page.locator('#view-option rect[style*="cursor: pointer"]');
+  const sceneDisplay = () => page.evaluate(() => ({
+    cube: document.getElementById("cube").getAttribute("display"),
+    placeholder: document.getElementById("not-implemented").getAttribute("display"),
+  }));
+  const widgetBoxes = () => page.evaluate(() =>
+    ["focus-widget", "diag-toggle", "view-option", "caption"].map((id) => {
+      const r = document.getElementById(id).getBoundingClientRect();
+      return `${id}:${r.x.toFixed(1)},${r.y.toFixed(1)},${r.width.toFixed(1)}x${r.height.toFixed(1)}`;
+    }).join(" "));
   const viewLabelBefore = await page.textContent("#view-label");
+  const boxesBefore = await widgetBoxes();
   await viewRows.nth(1).click();
   const viewLabelFront = await page.textContent("#view-label");
-  const viewNoteFront = (await page.isVisible("#view-note")) ? await page.textContent("#view-note") : "(hidden)";
-  console.log(`view label: ${viewLabelBefore} -> ${viewLabelFront}; note: ${viewNoteFront}`);
-  if (viewLabelBefore !== "Cube View" || viewLabelFront !== "Front View" || viewNoteFront !== "Front View not implemented") {
-    console.error("FAIL: selecting Front View did not update the caption as expected");
+  const displayFront = await sceneDisplay();
+  const boxesFront = await widgetBoxes();
+  console.log(`view label: ${viewLabelBefore} -> ${viewLabelFront}; cube: ${displayFront.cube}, placeholder: ${displayFront.placeholder}`);
+  if (viewLabelBefore !== "Cube View" || viewLabelFront !== "Front View"
+      || displayFront.cube !== "none" || displayFront.placeholder !== "inline") {
+    console.error("FAIL: selecting Front View did not swap the cube for the placeholder");
+    exitCode = 1;
+  }
+  console.log(`widgets unmoved: ${boxesBefore === boxesFront}`);
+  if (boxesBefore !== boxesFront) {
+    console.error(`FAIL: widgets moved\n  before: ${boxesBefore}\n  after:  ${boxesFront}`);
     exitCode = 1;
   }
 
@@ -133,10 +151,10 @@ try {
   console.log(`screenshot: ${path.join(outDir, "screenshot-front-view.png")}`);
 
   await viewRows.nth(0).click();
-  const viewNoteCubeVisible = await page.isVisible("#view-note");
-  console.log(`view label after re-selecting cube: ${await page.textContent("#view-label")}; note visible: ${viewNoteCubeVisible}`);
-  if (viewNoteCubeVisible) {
-    console.error("FAIL: re-selecting Cube View did not hide the not-implemented note");
+  const displayCube = await sceneDisplay();
+  console.log(`view label after re-selecting cube: ${await page.textContent("#view-label")}; cube: ${displayCube.cube}, placeholder: ${displayCube.placeholder}`);
+  if (displayCube.cube !== "inline" || displayCube.placeholder !== "none") {
+    console.error("FAIL: re-selecting Cube View did not restore the cube");
     exitCode = 1;
   }
 

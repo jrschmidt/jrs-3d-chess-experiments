@@ -59,9 +59,10 @@ CWD. It:
    diag toggle, confirms it shows, and prints its distinct stroke colors;
    screenshots `screenshot-diag-on.png`.
 5. Clicks "Front View" in the view-option widget and confirms the caption's
-   red `#view-label` reads "Front View" and `#view-note` reads "Front View
-   not implemented"; screenshots `screenshot-front-view.png`. Then clicks
-   "Cube View" and confirms the note hides again.
+   red `#view-label` reads "Front View", the `#cube` group is hidden, the
+   `#not-implemented` placeholder is shown, and no widget (or the caption)
+   moved; screenshots `screenshot-front-view.png`. Then clicks "Cube View"
+   and confirms the cube is back and the placeholder hidden.
 6. Prints any browser console/page errors and exits non-zero if there were
    any, or if any check above failed.
 7. Kills its own server on exit (success, failure, or Ctrl-C).
@@ -77,8 +78,9 @@ focus level: 1 -> 2
 diag overlay display (before toggle): none
 diag overlay display (after toggle): inline
 diag square colors (hex): #1953ff | #b300b3 | #b34100 | #178217
-view label: Cube View -> Front View; note: Front View not implemented
-view label after re-selecting cube: Cube View; note visible: false
+view label: Cube View -> Front View; cube: none, placeholder: inline
+widgets unmoved: true
+view label after re-selecting cube: Cube View; cube: inline, placeholder: none
 no console errors
 ```
 
@@ -110,8 +112,8 @@ No test suite exists in this repo.
   - `#diag-toggle`: a single match.
   - `#view-option`: one per row, in order Cube, Front, Top, Side.
 - **The caption is HTML, not SVG.** `#caption` in `index.html` holds the
-  static text plus `#view-label` and `#view-note` (toggled via the `hidden`
-  attribute), so check visibility with `page.isVisible`, not an SVG
+  static text plus `#view-label` and the debug readout. The SVG's `#cube`
+  and `#not-implemented` groups, by contrast, are toggled via their
   `display` attribute.
 - **Spawn the vite binary directly, not `npx vite`/`npm run dev`.** The
   driver kills its child on exit; with an npm/npx wrapper in between, the

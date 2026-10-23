@@ -24,6 +24,7 @@ export interface DisplayState {
 const initDisplayStates: Readonly<
   { 'cube-view': DisplayState } & Partial<Record<ViewName, DisplayState>>
 > = {
+
   'cube-view': {
     view: 'cube-view',
     perspective: 'all',
@@ -32,6 +33,7 @@ const initDisplayStates: Readonly<
     file: 1,
     show3dDiagonals: false,
   },
+
   'front-white': {
     view: 'front-white',
     perspective: 'white',
@@ -40,6 +42,7 @@ const initDisplayStates: Readonly<
     file: 3,
     show3dDiagonals: false,
   },
+
 };
 
 // Private: read and written only through the accessors below.

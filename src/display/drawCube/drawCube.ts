@@ -6,7 +6,7 @@ import { SVG_NS, svgEl } from '../render/svg.ts';
 import { buildFocusWidget } from '../widgets/focusWidget.ts';
 import { buildDiagToggle } from '../widgets/diagToggle.ts';
 import { buildViewOption } from '../widgets/viewOption.ts';
-import { DISPLAY_CHANGE } from '../widgets/widgetChrome.ts';
+import { DISPLAY_CHANGE, TEXT_STYLE } from '../widgets/widgetChrome.ts';
 import {
   getDisplayState, getView, getLevel, getShow3dDiagonals,
   setView, setPerspective, setLevel, setRank, setFile, setShow3dDiagonals,
@@ -38,8 +38,7 @@ const CHECKER_COLORS = {
 // currently paying attention to; its checkerboard is shown brightest, with
 // every other level faint.
 
-// Caption label for each view. Only the cube view is implemented; the
-// others just report themselves as not implemented.
+// Caption label for each view.
 const VIEW_LABELS = {
   "cube-view": "Cube View",
   "front-white": "Front View",
@@ -49,16 +48,14 @@ const VIEW_LABELS = {
   "top-view": "Top View",
 };
 
-// Updates the caption's red view label, and the "not implemented" note
-// shown beneath it for any view other than the cube view.
+// Updates the caption's red view label.
 const showViewStatus = () => {
-  const view = getView();
-  const label = VIEW_LABELS[view];
-  document.getElementById("view-label").textContent = label;
-  const note = document.getElementById("view-note");
-  note.textContent = `${label} not implemented`;
-  note.hidden = view === "cube-view";
+  document.getElementById("view-label").textContent = VIEW_LABELS[getView()];
 };
+
+// Only the cube view is drawn so far; every other view shows the
+// "THIS VIEW / NOT IMPLEMENTED" placeholder in the cube's place.
+const isViewImplemented = (view) => view === "cube-view";
 
 // TEMP: live readout of displayState in the caption, for debugging.
 const showDisplayStateDebug = () => {
@@ -256,11 +253,10 @@ const parseSvgFragment = (markup) => {
 const renderPieceIcon = (type, color, location) => {
   const iconKey = `${type.toLowerCase()}${color[0]}`;
   const { level, rank, file } = location;
-  const sceneEl = document.getElementById("scene");
   const center = add(projectCenter(rank, level, file), scale(V_LEVEL, -HALF));
   const g = svgEl("g", { transform: `translate(${center.x.toFixed(2)}, ${center.y.toFixed(2)})` });
   g.appendChild(parseSvgFragment(PIECE_ICONS[iconKey]));
-  sceneEl.appendChild(g);
+  cubeGroupEl.appendChild(g);
   return g;
 };
 
@@ -335,6 +331,12 @@ let floorPolys = [];
 let verticalHighlightEls = [];
 let diagGroupEl = null;
 
+// Populated by buildScene; refreshDisplay shows exactly one of the two,
+// depending on whether the current view is implemented. Piece icons are
+// drawn into cubeGroupEl too, so they hide along with the cube.
+let cubeGroupEl = null;
+let notImplementedEl = null;
+
 const refreshFocus = () => {
   const focusLevel = getLevel();
   for (const { el, level, variant } of checkerPolys) {
@@ -351,6 +353,9 @@ const refreshFocus = () => {
 const refreshDisplay = () => {
   refreshFocus();
   diagGroupEl.setAttribute("display", getShow3dDiagonals() ? "inline" : "none");
+  const implemented = isViewImplemented(getView());
+  cubeGroupEl.setAttribute("display", implemented ? "inline" : "none");
+  notImplementedEl.setAttribute("display", implemented ? "none" : "inline");
   showViewStatus();
   showDisplayStateDebug();
 };
@@ -512,6 +517,33 @@ const buildFrame = (bbox) => {
   return floorGroup;
 };
 
+const NOT_IMPLEMENTED_COLOR = "#33cc33";
+
+// Two large green lines, "THIS VIEW" / "NOT IMPLEMENTED", centered on the
+// cube's bbox (pass it before the widgets are merged in). Shown in place of
+// the hidden cube, so the viewBox — and every widget's position — is the
+// same in every view.
+const buildNotImplemented = (bbox) => {
+  const g = svgEl("g", { id: "not-implemented", display: "none" });
+  const cx = (bbox.minX + bbox.maxX) / 2;
+  const cy = (bbox.minY + bbox.maxY) / 2;
+  const fontSize = PITCH * 0.8;
+  ["THIS VIEW", "NOT IMPLEMENTED"].forEach((line, i) => {
+    const text = svgEl("text", {
+      x: cx, y: cy + fontSize * 0.6 * (i === 0 ? -1 : 1),
+      "text-anchor": "middle",
+      "dominant-baseline": "central",
+      "font-size": fontSize,
+      "font-weight": "bold",
+      "font-family": TEXT_STYLE["font-family"],
+      fill: NOT_IMPLEMENTED_COLOR,
+    });
+    text.textContent = line;
+    g.appendChild(text);
+  });
+  return g;
+};
+
 // The focus-level widget and diagonal toggle, anchored at the cube's
 // bottom-right corner — so bbox must already cover the whole cube — plus
 // the view selector at the cube's left.
@@ -579,9 +611,14 @@ export const buildScene = () => {
 
   // Append order is paint order: checkers under diag squares under the frame.
   svg.appendChild(buildClipDefs());
-  svg.appendChild(buildCheckers(bbox));
-  svg.appendChild(buildDiagSquares());
-  svg.appendChild(buildFrame(bbox));
+  cubeGroupEl = svgEl("g", { id: "cube" });
+  cubeGroupEl.appendChild(buildCheckers(bbox));
+  cubeGroupEl.appendChild(buildDiagSquares());
+  cubeGroupEl.appendChild(buildFrame(bbox));
+  svg.appendChild(cubeGroupEl);
+
+  notImplementedEl = buildNotImplemented(bbox);
+  svg.appendChild(notImplementedEl);
 
   buildControls(svg, bbox);
   fitViewBox(svg, bbox);
