@@ -1,17 +1,17 @@
 // @ts-nocheck
 import { PITCH } from '../render/constants.ts';
 import { svgEl } from '../render/svg.ts';
-import { TEXT_STYLE, makePanelRect, makeHitRect } from './widgetChrome.ts';
+import { TEXT_STYLE, makePanelRect, makeHitRect, emitDisplayChange } from './widgetChrome.ts';
 
 // Small widget for choosing the focus level: a numeral, an up/down arrow
 // pair, and a "LEVEL" label, anchored so its horizontal midpoint sits on
 // (anchorX, anchorY) — the caller passes the cube's own bottom-right corner
 // so the widget tracks the cube regardless of grid size or tilt angle.
 //
-// The widget keeps its own current value, clamped to min..max, and calls
-// onChange(value) whenever an arrow changes it; the caller owns whatever
-// redraw that change requires.
-export const buildFocusWidget = (anchorX, anchorY, { initial, min, max, onChange }) => {
+// The widget keeps its own current value, clamped to min..max, and fires a
+// "level" display-change event (see emitDisplayChange) whenever an arrow
+// changes it.
+export const buildFocusWidget = (anchorX, anchorY, { initial, min, max }) => {
   let value = initial;
 
   const W = PITCH * 1.0;
@@ -59,7 +59,7 @@ export const buildFocusWidget = (anchorX, anchorY, { initial, min, max, onChange
     if (next < min || next > max) return;
     value = next;
     numeralEl.textContent = String(value);
-    onChange(value);
+    emitDisplayChange(g, "level", value);
   };
 
   const buttonH = (contentY1 - contentY0) / 2;

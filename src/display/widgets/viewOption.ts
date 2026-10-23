@@ -1,24 +1,25 @@
 // @ts-nocheck
 import { PITCH } from '../render/constants.ts';
 import { svgEl } from '../render/svg.ts';
-import { TEXT_STYLE, makePanelRect, makeHitRect } from './widgetChrome.ts';
+import { TEXT_STYLE, makePanelRect, makeHitRect, emitDisplayChange } from './widgetChrome.ts';
 
 // Selector for the camera view: four options stacked vertically, anchored
 // so its right edge sits at anchorRightX and its bottom at anchorBottomY
 // (the caller passes a point just left of the cube's bottom back-left
 // corner, so the widget sits beside the cube).
 //
-// The widget keeps its own selected option and calls onChange(id, label)
-// whenever a different option is clicked; the caller owns whatever that
-// change requires.
+// The widget keeps its own selected option and fires a "view"
+// display-change event (see emitDisplayChange) whenever a different option
+// is clicked. Option ids are ViewNames (see drawOrder.ts); Front and Side
+// use the white-side variant for now.
 const OPTIONS = [
-  { id: "cube", label: "Cube View" },
-  { id: "front", label: "Front View" },
-  { id: "top", label: "Top View" },
-  { id: "side", label: "Side View" },
+  { id: "cube-view", label: "Cube View" },
+  { id: "front-white", label: "Front View" },
+  { id: "top-view", label: "Top View" },
+  { id: "side-white", label: "Side View" },
 ];
 
-export const buildViewOption = (anchorRightX, anchorBottomY, { initial, onChange }) => {
+export const buildViewOption = (anchorRightX, anchorBottomY, { initial }) => {
   let value = initial;
 
   const W = PITCH * 1.4;
@@ -56,7 +57,7 @@ export const buildViewOption = (anchorRightX, anchorBottomY, { initial, onChange
       if (id === value) return;
       value = id;
       restyle();
-      onChange(id, label);
+      emitDisplayChange(g, "view", id);
     }));
 
     return { id, highlight, text };

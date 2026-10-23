@@ -6,6 +6,11 @@ import { SVG_NS, svgEl } from '../render/svg.ts';
 import { buildFocusWidget } from '../widgets/focusWidget.ts';
 import { buildDiagToggle } from '../widgets/diagToggle.ts';
 import { buildViewOption } from '../widgets/viewOption.ts';
+import { DISPLAY_CHANGE } from '../widgets/widgetChrome.ts';
+import {
+  getDisplayState, getView, getLevel, getShow3dDiagonals,
+  setView, setPerspective, setLevel, setRank, setFile, setShow3dDiagonals,
+} from '../displayState.ts';
 
 
 // Cell coordinates (rank, level, file) are defined in render/constants.ts.
@@ -28,24 +33,37 @@ const CHECKER_COLORS = {
   unfocused: { light: "#808080", dark: "#333333" },
 };
 
-// The "focus level" is the level the viewer is currently paying attention
-// to; its checkerboard is shown brightest, with every other level faint.
-let focusLevel = 1;
+// Display state (focus level, diagonal overlay, view, ...) lives in
+// displayState.ts. The "focus level" (getLevel) is the level the viewer is
+// currently paying attention to; its checkerboard is shown brightest, with
+// every other level faint.
 
-// Whether the diagonal-square overlay is shown at all; off by default.
-let diagVisible = false;
-
-// The camera view chosen in the view-option widget. Only "cube" is
-// implemented; the others just report themselves as not implemented.
-let currentView = "cube";
+// Caption label for each view. Only the cube view is implemented; the
+// others just report themselves as not implemented.
+const VIEW_LABELS = {
+  "cube-view": "Cube View",
+  "front-white": "Front View",
+  "front-black": "Front View",
+  "side-white": "Side View",
+  "side-black": "Side View",
+  "top-view": "Top View",
+};
 
 // Updates the caption's red view label, and the "not implemented" note
 // shown beneath it for any view other than the cube view.
-const showViewStatus = (id, label) => {
+const showViewStatus = () => {
+  const view = getView();
+  const label = VIEW_LABELS[view];
   document.getElementById("view-label").textContent = label;
   const note = document.getElementById("view-note");
   note.textContent = `${label} not implemented`;
-  note.hidden = id === "cube";
+  note.hidden = view === "cube-view";
+};
+
+// TEMP: live readout of displayState in the caption, for debugging.
+const showDisplayStateDebug = () => {
+  document.getElementById("display-state-debug").textContent =
+    JSON.stringify(getDisplayState(), null, 2);
 };
 
 const checkerColor = (level, variant, focus) =>
@@ -318,6 +336,7 @@ let verticalHighlightEls = [];
 let diagGroupEl = null;
 
 const refreshFocus = () => {
+  const focusLevel = getLevel();
   for (const { el, level, variant } of checkerPolys) {
     el.setAttribute("fill", checkerColor(level, variant, focusLevel));
   }
@@ -325,6 +344,33 @@ const refreshFocus = () => {
     el.setAttribute("stroke", perimeterStroke(boundaryIndex, focusLevel));
   }
   updateVerticalHighlights(focusLevel);
+};
+
+// Brings everything that depends on displayState up to date. Cheap enough
+// to run in full after any change, rather than tracking which field moved.
+const refreshDisplay = () => {
+  refreshFocus();
+  diagGroupEl.setAttribute("display", getShow3dDiagonals() ? "inline" : "none");
+  showViewStatus();
+  showDisplayStateDebug();
+};
+
+// Every widget reports its changes as a display-change event {field, value}
+// (see emitDisplayChange in widgets/widgetChrome.ts); this maps each field
+// to the displayState setter that records it.
+const SETTERS = {
+  view: setView,
+  perspective: setPerspective,
+  level: setLevel,
+  rank: setRank,
+  file: setFile,
+  show3dDiagonals: setShow3dDiagonals,
+};
+
+const onDisplayChange = (e) => {
+  const { field, value } = e.detail;
+  SETTERS[field](value);
+  refreshDisplay();
 };
 
 // Attrs for a cell polygon at `level`: a clip-path masking it to its
@@ -373,7 +419,7 @@ const buildCheckers = (bbox) => {
     const variant = isDarkCell(rank, level, file) ? "dark" : "light";
     const poly = svgEl("polygon", {
       points: pointsAttr(corners),
-      fill: checkerColor(level, variant, focusLevel),
+      fill: checkerColor(level, variant, getLevel()),
       stroke: "none",
       ...clipAttrsForLevel(level),
     });
@@ -387,7 +433,7 @@ const buildCheckers = (bbox) => {
 // The diagonal-square overlay: one inset outline per cell, colored by its
 // diagonal set. Inset inside each cell, so it never extends the bbox.
 const buildDiagSquares = () => {
-  diagGroupEl = svgEl("g", { id: "diag-squares", display: diagVisible ? "inline" : "none" });
+  diagGroupEl = svgEl("g", { id: "diag-squares", display: getShow3dDiagonals() ? "inline" : "none" });
   forEachCell((rank, level, file) => {
     const diagId = diagForCell(rank, level, file);
     const diagCorners = cellFootprintInset(rank, level, file, DIAG_SQUARE_MARGIN);
@@ -417,7 +463,7 @@ const buildFrame = (bbox) => {
     const poly = svgEl("polyline", {
       points: pointsAttr([corners[3], corners[0], corners[1]]),
       fill: "none",
-      stroke: perimeterStroke(boundaryIndex, focusLevel),
+      stroke: perimeterStroke(boundaryIndex, getLevel()),
       "stroke-width": 5,
       "stroke-linejoin": "round",
     });
@@ -445,7 +491,7 @@ const buildFrame = (bbox) => {
     const poly = svgEl("polygon", {
       points: pointsAttr(corners),
       fill: "none",
-      stroke: perimeterStroke(boundaryIndex, focusLevel),
+      stroke: perimeterStroke(boundaryIndex, getLevel()),
       "stroke-width": 3,
       "stroke-linejoin": "round",
     });
@@ -461,7 +507,7 @@ const buildFrame = (bbox) => {
     verticalHighlightEls.push({ el, corner });
     floorGroup.appendChild(el);
   }
-  updateVerticalHighlights(focusLevel);
+  updateVerticalHighlights(getLevel());
 
   return floorGroup;
 };
@@ -471,21 +517,16 @@ const buildFrame = (bbox) => {
 // the view selector at the cube's left.
 const buildControls = (svg, bbox) => {
   const widget = buildFocusWidget(bbox.maxX, bbox.maxY, {
-    initial: focusLevel,
+    initial: getLevel(),
     min: 1,
     max: LEVEL_MAX,
-    onChange: (level) => { focusLevel = level; refreshFocus(); },
   });
   svg.appendChild(widget.el);
   mergeBounds(bbox, widget);
 
   const diagToggleGap = PITCH * 0.2;
   const diagToggle = buildDiagToggle(widget.maxX + diagToggleGap, (widget.minY + widget.maxY) / 2, {
-    initial: diagVisible,
-    onToggle: (on) => {
-      diagVisible = on;
-      diagGroupEl.setAttribute("display", diagVisible ? "inline" : "none");
-    },
+    initial: getShow3dDiagonals(),
   });
   svg.appendChild(diagToggle.el);
   mergeBounds(bbox, diagToggle);
@@ -496,11 +537,7 @@ const buildControls = (svg, bbox) => {
   // centerViewOption slides it to its final spot once the viewBox is set.
   const backLeft = perimeterCorners(1, -1).backLeft;
   const viewOption = buildViewOption(backLeft.x - PITCH * 0.4, backLeft.y, {
-    initial: currentView,
-    onChange: (id, label) => {
-      currentView = id;
-      showViewStatus(id, label);
-    },
+    initial: getView(),
   });
   svg.appendChild(viewOption.el);
   mergeBounds(bbox, viewOption);
@@ -551,4 +588,7 @@ export const buildScene = () => {
 
   centerViewOption(svg);
   window.addEventListener("resize", () => centerViewOption(svg));
+
+  svg.addEventListener(DISPLAY_CHANGE, onDisplayChange);
+  refreshDisplay();
 };

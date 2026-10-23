@@ -1,7 +1,7 @@
 // @ts-nocheck
 import { PITCH } from '../render/constants.ts';
 import { svgEl } from '../render/svg.ts';
-import { TEXT_STYLE, makePanelRect, makeHitRect } from './widgetChrome.ts';
+import { TEXT_STYLE, makePanelRect, makeHitRect, emitDisplayChange } from './widgetChrome.ts';
 
 // Binary on/off control for the diagonal-square overlay, anchored so its
 // left edge sits at anchorLeftX and its vertical midpoint sits at
@@ -9,11 +9,11 @@ import { TEXT_STYLE, makePanelRect, makeHitRect } from './widgetChrome.ts';
 // vertical center, so it sits alongside it). A 3-line title sits above the
 // clickable button, which itself just reads "ON"/"OFF".
 //
-// The toggle keeps its own on/off value and calls onToggle(on) on each
-// click; the caller owns showing or hiding the overlay.
+// The toggle keeps its own on/off value and fires a "show3dDiagonals"
+// display-change event (see emitDisplayChange) on each click.
 const TITLE_LINES = ["SHOW THREE", "DIMENSIONAL", "DIAGONALS"];
 
-export const buildDiagToggle = (anchorLeftX, anchorCenterY, { initial, onToggle }) => {
+export const buildDiagToggle = (anchorLeftX, anchorCenterY, { initial }) => {
   let on = initial;
 
   const W = PITCH * 1.3;
@@ -62,7 +62,7 @@ export const buildDiagToggle = (anchorLeftX, anchorCenterY, { initial, onToggle 
   g.appendChild(makeHitRect(x0, buttonY0, W, buttonH, () => {
     on = !on;
     stateLabel.textContent = on ? "ON" : "OFF";
-    onToggle(on);
+    emitDisplayChange(g, "show3dDiagonals", on);
   }));
 
   return { el: g, minX: x0, minY: y0, maxX: x1, maxY: y1 };

@@ -1,7 +1,15 @@
 // @ts-nocheck
 import { svgEl } from '../render/svg.ts';
 
-// --- Widget chrome helpers (shared by buildFocusWidget/buildDiagToggle) ---
+// Event every widget fires when the user changes a displayState field; it
+// bubbles up to the listener on #scene (see drawCube.ts), which calls the
+// matching displayState setter and redraws.
+export const DISPLAY_CHANGE = "display-change";
+
+export const emitDisplayChange = (el, field, value) =>
+  el.dispatchEvent(new CustomEvent(DISPLAY_CHANGE, { bubbles: true, detail: { field, value } }));
+
+// --- Widget chrome helpers (shared by all widgets) ---
 export const TEXT_STYLE = { "font-family": "system-ui, sans-serif", fill: "#cdd3de" };
 
 export const makePanelRect = (x0, y0, w, h) =>

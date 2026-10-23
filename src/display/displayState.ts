@@ -30,13 +30,22 @@ const initDisplayState: Readonly<DisplayState> = {
 // Private: read and written only through the accessors below.
 const displayState = {} as DisplayState;
 
-// Copies initDisplayState's values in (rather than sharing the object), so
-// setters never modify initDisplayState and this can be called again to reset.
-export const setInitDisplayState = (): void => {
-  Object.assign(displayState, initDisplayState);
+// Sets every attribute at once. Copies the values in (rather than sharing
+// the object), so later changes to `state` don't leak into displayState,
+// and setters never modify the object that was passed in.
+export const setDisplayState = (state: DisplayState): void => {
+  Object.assign(displayState, state);
 };
 
-export const getView = (): ViewName => displayState.view;
+// A copy of the whole state, so callers can't modify displayState itself.
+export const getDisplayState = (): DisplayState => ({ ...displayState });
+
+// Can be called again later to reset to the initial values.
+export const setInitDisplayState = (): void => {
+  setDisplayState(initDisplayState);
+};
+
+export const getView =(): ViewName => displayState.view;
 export const setView = (view: ViewName): void => { displayState.view = view; };
 
 export const getPerspective = (): Perspective => displayState.perspective;
