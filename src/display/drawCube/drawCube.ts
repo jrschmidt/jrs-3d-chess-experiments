@@ -3,13 +3,13 @@ import { PIECE_ICONS } from '../render/pieceIcons.ts';
 import { piecesInDrawOrder } from '../drawOrder.ts';
 import { LEVEL_MAX, RANK_MAX, FILE_MAX, PITCH } from '../render/constants.ts';
 import { SVG_NS, svgEl } from '../render/svg.ts';
-import { buildFocusWidget } from '../widgets/focusWidget.ts';
+import { buildLevelFocusWidget } from '../widgets/levelFocusWidget.ts';
 import { buildDiagToggle } from '../widgets/diagToggle.ts';
 import { buildViewOption } from '../widgets/viewOption.ts';
 import { DISPLAY_CHANGE, TEXT_STYLE } from '../widgets/widgetChrome.ts';
 import {
   getDisplayState, getView, getLevel, getShow3dDiagonals,
-  setView, setPerspective, setLevel, setRank, setFile, setShow3dDiagonals,
+  changeView, setPerspective, setLevel, setRank, setFile, setShow3dDiagonals,
 } from '../displayState.ts';
 
 
@@ -356,15 +356,19 @@ const refreshDisplay = () => {
   const implemented = isViewImplemented(getView());
   cubeGroupEl.setAttribute("display", implemented ? "inline" : "none");
   notImplementedEl.setAttribute("display", implemented ? "none" : "inline");
+  // A view change can reset fields other widgets own, so resync them.
+  levelFocusWidgetEl.setValue(getLevel());
+  diagToggleEl.setValue(getShow3dDiagonals());
   showViewStatus();
   showDisplayStateDebug();
 };
 
 // Every widget reports its changes as a display-change event {field, value}
 // (see emitDisplayChange in widgets/widgetChrome.ts); this maps each field
-// to the displayState setter that records it.
+// to the displayState setter that records it. A view change also resets
+// the other fields when that view has an initial state (see changeView).
 const SETTERS = {
-  view: setView,
+  view: changeView,
   perspective: setPerspective,
   level: setLevel,
   rank: setRank,
@@ -548,13 +552,14 @@ const buildNotImplemented = (bbox) => {
 // bottom-right corner — so bbox must already cover the whole cube — plus
 // the view selector at the cube's left.
 const buildControls = (svg, bbox) => {
-  const widget = buildFocusWidget(bbox.maxX, bbox.maxY, {
+  const widget = buildLevelFocusWidget(bbox.maxX, bbox.maxY, {
     initial: getLevel(),
     min: 1,
     max: LEVEL_MAX,
   });
   svg.appendChild(widget.el);
   mergeBounds(bbox, widget);
+  levelFocusWidgetEl = widget;
 
   const diagToggleGap = PITCH * 0.2;
   const diagToggle = buildDiagToggle(widget.maxX + diagToggleGap, (widget.minY + widget.maxY) / 2, {
@@ -562,6 +567,7 @@ const buildControls = (svg, bbox) => {
   });
   svg.appendChild(diagToggle.el);
   mergeBounds(bbox, diagToggle);
+  diagToggleEl = diagToggle;
 
   // The view selector sits left of the cube, its bottom level with the
   // bottom of the back-left vertical edge (the cube's leftmost point). It's
@@ -578,6 +584,10 @@ const buildControls = (svg, bbox) => {
 
 // Populated by buildControls; used by centerViewOption.
 let viewOptionEl = null;
+
+// Populated by buildControls; refreshDisplay resyncs them to displayState.
+let levelFocusWidgetEl = null;
+let diagToggleEl = null;
 
 // Shifts the view selector so it's centered horizontally midway between
 // the left edge of the display and the cube's leftmost point. The display's

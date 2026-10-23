@@ -10,8 +10,9 @@ import { TEXT_STYLE, makePanelRect, makeHitRect, emitDisplayChange } from './wid
 //
 // The widget keeps its own current value, clamped to min..max, and fires a
 // "level" display-change event (see emitDisplayChange) whenever an arrow
-// changes it.
-export const buildFocusWidget = (anchorX, anchorY, { initial, min, max }) => {
+// changes it. setValue updates the shown value from outside (e.g. when a
+// view change resets displayState) without firing an event.
+export const buildLevelFocusWidget = (anchorX, anchorY, { initial, min, max }) => {
   let value = initial;
 
   const W = PITCH * 1.0;
@@ -22,7 +23,7 @@ export const buildFocusWidget = (anchorX, anchorY, { initial, min, max }) => {
   const y1 = anchorY;
   const cx = (x0 + x1) / 2;
 
-  const g = svgEl("g", { id: "focus-widget" });
+  const g = svgEl("g", { id: "level-focus-widget" });
 
   g.appendChild(makePanelRect(x0, y0, W, H));
 
@@ -85,5 +86,10 @@ export const buildFocusWidget = (anchorX, anchorY, { initial, min, max }) => {
   makeButton(contentY0, contentY0 + buttonH, "up", () => step(1));
   makeButton(contentY0 + buttonH, contentY1, "down", () => step(-1));
 
-  return { el: g, minX: x0, minY: y0, maxX: x1, maxY: y1 };
+  const setValue = (v) => {
+    value = v;
+    numeralEl.textContent = String(value);
+  };
+
+  return { el: g, setValue, minX: x0, minY: y0, maxX: x1, maxY: y1 };
 };

@@ -63,6 +63,13 @@ export const setInitDisplayState = (): void => {
   setDisplayState(initDisplayStates['cube-view']);
 };
 
+// Switches to `view`. If that view has an initial display state, every
+// field is reset to it; otherwise only the view changes.
+export const changeView = (view: ViewName): void => {
+  const init = initDisplayStates[view];
+  if (init) setDisplayState(init); else setView(view);
+};
+
 export const getView =(): ViewName => displayState.view;
 export const setView = (view: ViewName): void => { displayState.view = view; };
 

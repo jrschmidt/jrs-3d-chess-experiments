@@ -66,12 +66,12 @@ try {
 
   // Representative interaction: click the focus-level widget's up arrow and
   // confirm the LEVEL numeral advances (1 -> 2). The two hit-target rects
-  // inside #focus-widget are the only elements with a `cursor: pointer`
-  // style; the first is "up", the second is "down" (see buildFocusWidget in
-  // src/display/widgets/focusWidget.ts — up is wired before down).
-  const numeral = page.locator('#focus-widget text[dominant-baseline="central"]');
+  // inside #level-focus-widget are the only elements with a `cursor: pointer`
+  // style; the first is "up", the second is "down" (see buildLevelFocusWidget in
+  // src/display/widgets/levelFocusWidget.ts — up is wired before down).
+  const numeral = page.locator('#level-focus-widget text[dominant-baseline="central"]');
   const before = await numeral.textContent();
-  await page.locator('#focus-widget rect[style*="cursor: pointer"]').first().click();
+  await page.locator('#level-focus-widget rect[style*="cursor: pointer"]').first().click();
   const after = await numeral.textContent();
   console.log(`focus level: ${before} -> ${after}`);
   if (after === before) {
@@ -125,9 +125,11 @@ try {
     placeholder: document.getElementById("not-implemented").getAttribute("display"),
   }));
   const widgetBoxes = () => page.evaluate(() =>
-    ["focus-widget", "diag-toggle", "view-option", "caption"].map((id) => {
+    ["level-focus-widget", "diag-toggle", "view-option", "caption"].map((id) => {
       const r = document.getElementById(id).getBoundingClientRect();
-      return `${id}:${r.x.toFixed(1)},${r.y.toFixed(1)},${r.width.toFixed(1)}x${r.height.toFixed(1)}`;
+      // Position only: sizes can change with content (e.g. the caption's
+      // debug readout), which isn't a move.
+      return `${id}:${r.x.toFixed(1)},${r.y.toFixed(1)}`;
     }).join(" "));
   const viewLabelBefore = await page.textContent("#view-label");
   const boxesBefore = await widgetBoxes();
@@ -150,11 +152,43 @@ try {
   await page.screenshot({ path: path.join(outDir, "screenshot-front-view.png") });
   console.log(`screenshot: ${path.join(outDir, "screenshot-front-view.png")}`);
 
+  // Switching to a view with an initial display state (cube-view,
+  // front-white — see initDisplayStates in src/display/displayState.ts)
+  // resets every field to it, and the level widget and diag toggle must
+  // show the reset values. A view without one (Top) changes only `view`.
+  const diagLabel = page.locator('#diag-toggle text[dominant-baseline="central"]');
+  const debugState = async () => JSON.parse(await page.textContent("#display-state-debug"));
+  const checkState = async (name, expected) => {
+    const state = await debugState();
+    const shown = { level: await numeral.textContent(), diag: await diagLabel.textContent() };
+    const wantShown = { level: String(expected.level), diag: expected.show3dDiagonals ? "ON" : "OFF" };
+    const ok = JSON.stringify(state) === JSON.stringify(expected)
+      && JSON.stringify(shown) === JSON.stringify(wantShown);
+    console.log(`${name}: state ${JSON.stringify(state)}; widgets level ${shown.level}, diag ${shown.diag}`);
+    if (!ok) {
+      console.error(`FAIL: ${name} expected state ${JSON.stringify(expected)}, widgets ${JSON.stringify(wantShown)}`);
+      exitCode = 1;
+    }
+  };
+  const FRONT_INIT = { view: "front-white", perspective: "white", level: 3, rank: 1, file: 3, show3dDiagonals: false };
+  const CUBE_INIT = { view: "cube-view", perspective: "all", level: 1, rank: 4, file: 1, show3dDiagonals: false };
+  await checkState("front after reset", FRONT_INIT);
+
+  await page.locator('#level-focus-widget rect[style*="cursor: pointer"]').first().click();
+  await viewRows.nth(2).click();
+  await checkState("top (no initial state)", { ...FRONT_INIT, view: "top-view", level: 4 });
+
   await viewRows.nth(0).click();
   const displayCube = await sceneDisplay();
   console.log(`view label after re-selecting cube: ${await page.textContent("#view-label")}; cube: ${displayCube.cube}, placeholder: ${displayCube.placeholder}`);
   if (displayCube.cube !== "inline" || displayCube.placeholder !== "none") {
     console.error("FAIL: re-selecting Cube View did not restore the cube");
+    exitCode = 1;
+  }
+  await checkState("cube after reset", CUBE_INIT);
+  const diagDisplayCube = await page.locator("#diag-squares").getAttribute("display");
+  if (diagDisplayCube !== "none") {
+    console.error("FAIL: diag overlay should be hidden after resetting to cube-view");
     exitCode = 1;
   }
 

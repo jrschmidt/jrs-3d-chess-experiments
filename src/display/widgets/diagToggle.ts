@@ -10,7 +10,9 @@ import { TEXT_STYLE, makePanelRect, makeHitRect, emitDisplayChange } from './wid
 // clickable button, which itself just reads "ON"/"OFF".
 //
 // The toggle keeps its own on/off value and fires a "show3dDiagonals"
-// display-change event (see emitDisplayChange) on each click.
+// display-change event (see emitDisplayChange) on each click. setValue
+// updates the shown value from outside (e.g. when a view change resets
+// displayState) without firing an event.
 const TITLE_LINES = ["SHOW THREE", "DIMENSIONAL", "DIAGONALS"];
 
 export const buildDiagToggle = (anchorLeftX, anchorCenterY, { initial }) => {
@@ -65,5 +67,10 @@ export const buildDiagToggle = (anchorLeftX, anchorCenterY, { initial }) => {
     emitDisplayChange(g, "show3dDiagonals", on);
   }));
 
-  return { el: g, minX: x0, minY: y0, maxX: x1, maxY: y1 };
+  const setValue = (v) => {
+    on = v;
+    stateLabel.textContent = on ? "ON" : "OFF";
+  };
+
+  return { el: g, setValue, minX: x0, minY: y0, maxX: x1, maxY: y1 };
 };

@@ -61,8 +61,13 @@ CWD. It:
 5. Clicks "Front View" in the view-option widget and confirms the caption's
    red `#view-label` reads "Front View", the `#cube` group is hidden, the
    `#not-implemented` placeholder is shown, and no widget (or the caption)
-   moved; screenshots `screenshot-front-view.png`. Then clicks "Cube View"
-   and confirms the cube is back and the placeholder hidden.
+   moved; screenshots `screenshot-front-view.png`. Confirms the switch reset
+   displayState (read from `#display-state-debug`) to front-white's initial
+   state and that the LEVEL numeral and diag toggle show it. Steps the level
+   up and clicks "Top View" (no initial state), confirming only `view`
+   changed. Then clicks "Cube View" and confirms the cube is back, the
+   placeholder hidden, and state/widgets reset to cube-view's initial
+   state.
 6. Prints any browser console/page errors and exits non-zero if there were
    any, or if any check above failed.
 7. Kills its own server on exit (success, failure, or Ctrl-C).
@@ -80,7 +85,10 @@ diag overlay display (after toggle): inline
 diag square colors (hex): #1953ff | #b300b3 | #b34100 | #178217
 view label: Cube View -> Front View; cube: none, placeholder: inline
 widgets unmoved: true
+front after reset: state {"view":"front-white",...,"level":3,...}; widgets level 3, diag OFF
+top (no initial state): state {"view":"top-view",...,"level":4,...}; widgets level 4, diag OFF
 view label after re-selecting cube: Cube View; cube: inline, placeholder: none
+cube after reset: state {"view":"cube-view",...,"level":1,...}; widgets level 1, diag OFF
 no console errors
 ```
 
@@ -108,7 +116,7 @@ No test suite exists in this repo.
   `fill: rgba(255,255,255,0.001)` (nearly invisible, intentionally) and
   `style="cursor: pointer"` — that inline style is the only reliable
   selector, scoped by the widget's group id:
-  - `#focus-widget`: first match is "up", second is "down".
+  - `#level-focus-widget`: first match is "up", second is "down".
   - `#diag-toggle`: a single match.
   - `#view-option`: one per row, in order Cube, Front, Top, Side.
 - **The caption is HTML, not SVG.** `#caption` in `index.html` holds the
