@@ -53,10 +53,6 @@ const showViewStatus = () => {
   document.getElementById("view-label").textContent = VIEW_LABELS[getView()];
 };
 
-// Only the cube view is drawn so far; every other view shows the
-// "THIS VIEW / NOT IMPLEMENTED" placeholder in the cube's place.
-const isViewImplemented = (view) => view === "cube-view";
-
 // TEMP: live readout of displayState in the caption, for debugging.
 const showDisplayStateDebug = () => {
   document.getElementById("display-state-debug").textContent =
@@ -249,22 +245,28 @@ const parseSvgFragment = (markup) => {
 };
 
 // Draws the icon for a (type, color) piece (e.g. "K"/"black" -> PIECE_ICONS
-// key "kb") centered on `location`'s cell floor footprint.
-const renderPieceIcon = (type, color, location) => {
+// key "kb") centered on `center`, inside `parent`.
+const renderPieceIcon = (type, color, center, parent) => {
   const iconKey = `${type.toLowerCase()}${color[0]}`;
-  const { level, rank, file } = location;
-  const center = add(projectCenter(rank, level, file), scale(V_LEVEL, -HALF));
   const g = svgEl("g", { transform: `translate(${center.x.toFixed(2)}, ${center.y.toFixed(2)})` });
   g.appendChild(parseSvgFragment(PIECE_ICONS[iconKey]));
-  cubeGroupEl.appendChild(g);
+  parent.appendChild(g);
   return g;
 };
 
-// Draws every piece on the board, back to front for the given view (see
-// drawOrder.ts) so nearer icons paint over farther ones.
-export const renderPieceIcons = (view = 'cube-view') => {
-  for (const piece of piecesInDrawOrder(view)) {
-    renderPieceIcon(piece.type, piece.color, piece.location);
+// Draws every piece into the cube, centered on its cell floor footprint, and
+// the rank-1 pieces into the front view, centered on their cell's front
+// face. Each view draws back to front (see drawOrder.ts) so nearer icons
+// paint over farther ones.
+export const renderPieceIcons = () => {
+  for (const { type, color, location } of piecesInDrawOrder('cube-view')) {
+    const { level, rank, file } = location;
+    const center = add(projectCenter(rank, level, file), scale(V_LEVEL, -HALF));
+    renderPieceIcon(type, color, center, cubeGroupEl);
+  }
+  for (const { type, color, location } of piecesInDrawOrder('front-white')) {
+    if (location.rank !== 1) continue;
+    renderPieceIcon(type, color, frontCellCenter(location.level, location.file), frontPiecesEl);
   }
 };
 
@@ -329,13 +331,22 @@ const updateVerticalHighlights = (focus) => {
 let checkerPolys = [];
 let floorPolys = [];
 let verticalHighlightEls = [];
-let diagGroupEl = null;
+// The diag-square overlay groups (cube and front view), all shown or hidden
+// together by refreshDisplay.
+let diagGroupEls = [];
 
-// Populated by buildScene; refreshDisplay shows exactly one of the two,
-// depending on whether the current view is implemented. Piece icons are
-// drawn into cubeGroupEl too, so they hide along with the cube.
+// Populated by buildScene. refreshDisplay shows the current view's group
+// (see viewGroups), or the "THIS VIEW / NOT IMPLEMENTED" placeholder for a
+// view that isn't drawn yet. Piece icons are drawn into each view's group,
+// so they hide along with it.
 let cubeGroupEl = null;
+let frontViewEl = null;
+let frontPiecesEl = null;
 let notImplementedEl = null;
+
+// The group drawing each implemented view; views not listed show the
+// placeholder.
+const viewGroups = () => ({ "cube-view": cubeGroupEl, "front-white": frontViewEl });
 
 const refreshFocus = () => {
   const focusLevel = getLevel();
@@ -352,10 +363,14 @@ const refreshFocus = () => {
 // to run in full after any change, rather than tracking which field moved.
 const refreshDisplay = () => {
   refreshFocus();
-  diagGroupEl.setAttribute("display", getShow3dDiagonals() ? "inline" : "none");
-  const implemented = isViewImplemented(getView());
-  cubeGroupEl.setAttribute("display", implemented ? "inline" : "none");
-  notImplementedEl.setAttribute("display", implemented ? "none" : "inline");
+  for (const el of diagGroupEls) {
+    el.setAttribute("display", getShow3dDiagonals() ? "inline" : "none");
+  }
+  const groups = viewGroups();
+  for (const [view, el] of Object.entries(groups)) {
+    el.setAttribute("display", view === getView() ? "inline" : "none");
+  }
+  notImplementedEl.setAttribute("display", getView() in groups ? "none" : "inline");
   // A view change can reset fields other widgets own, so resync them.
   levelFocusWidgetEl.setValue(getLevel());
   diagToggleEl.setValue(getShow3dDiagonals());
@@ -442,7 +457,8 @@ const buildCheckers = (bbox) => {
 // The diagonal-square overlay: one inset outline per cell, colored by its
 // diagonal set. Inset inside each cell, so it never extends the bbox.
 const buildDiagSquares = () => {
-  diagGroupEl = svgEl("g", { id: "diag-squares", display: getShow3dDiagonals() ? "inline" : "none" });
+  const diagGroupEl = svgEl("g", { id: "diag-squares", display: getShow3dDiagonals() ? "inline" : "none" });
+  diagGroupEls.push(diagGroupEl);
   forEachCell((rank, level, file) => {
     const diagId = diagForCell(rank, level, file);
     const diagCorners = cellFootprintInset(rank, level, file, DIAG_SQUARE_MARGIN);
@@ -519,6 +535,91 @@ const buildFrame = (bbox) => {
   updateVerticalHighlights(getLevel());
 
   return floorGroup;
+};
+
+// Front view (front-white): rank 1 seen straight on from white's side, as a
+// LEVEL_MAX x FILE_MAX grid of PITCH-sized squares — file 1 at the left,
+// level 1 at the bottom. It uses the cube's scale and viewBox, so piece
+// icons are the same size on screen and no widget moves. Centered on the
+// point set by buildFrontView.
+let frontCenter = { x: 0, y: 0 };
+
+const frontCellCenter = (level, file) => ({
+  x: frontCenter.x + (file - (FILE_MAX + 1) / 2) * PITCH,
+  y: frontCenter.y - (level - (LEVEL_MAX + 1) / 2) * PITCH,
+});
+
+// The y of horizontal boundary `i` (0 = floor of level 1, LEVEL_MAX =
+// ceiling of LEVEL_MAX), as in boundaryCorners.
+const frontBoundaryY = (i) => frontCellCenter(i + 1, 1).y + PITCH / 2;
+
+// Built centered on the cube's bbox (pass it before the widgets are merged
+// in), which it fits inside, so it doesn't extend the bbox. Its checkers
+// and boundary lines join checkerPolys / floorPolys, so refreshFocus
+// highlights the focus level here as in the cube; its diag squares join
+// diagGroupEls, so the diag toggle shows them as in the cube.
+const buildFrontView = (bbox) => {
+  frontCenter = { x: (bbox.minX + bbox.maxX) / 2, y: (bbox.minY + bbox.maxY) / 2 };
+  frontViewEl = svgEl("g", { id: "front-view", display: "none" });
+
+  const checkerGroup = svgEl("g", { id: "front-checkers" });
+  for (let level = 1; level <= LEVEL_MAX; level++) {
+    for (let file = 1; file <= FILE_MAX; file++) {
+      const c = frontCellCenter(level, file);
+      const variant = isDarkCell(1, level, file) ? "dark" : "light";
+      const rect = svgEl("rect", {
+        x: c.x - PITCH / 2, y: c.y - PITCH / 2, width: PITCH, height: PITCH,
+        fill: checkerColor(level, variant, getLevel()),
+      });
+      checkerPolys.push({ el: rect, level, variant });
+      checkerGroup.appendChild(rect);
+    }
+  }
+  frontViewEl.appendChild(checkerGroup);
+
+  // Each cell's diag square, inset as in the cube (see buildDiagSquares).
+  const diagGroup = svgEl("g", { id: "front-diag-squares", display: getShow3dDiagonals() ? "inline" : "none" });
+  for (let level = 1; level <= LEVEL_MAX; level++) {
+    for (let file = 1; file <= FILE_MAX; file++) {
+      const c = frontCellCenter(level, file);
+      const half = PITCH / 2 - DIAG_SQUARE_MARGIN;
+      diagGroup.appendChild(svgEl("rect", {
+        x: c.x - half, y: c.y - half, width: half * 2, height: half * 2,
+        fill: "none",
+        stroke: DIAG_COLORS[diagForCell(1, level, file)],
+        "stroke-width": DIAG_SQUARE_STROKE_WIDTH,
+      }));
+    }
+  }
+  diagGroupEls.push(diagGroup);
+  frontViewEl.appendChild(diagGroup);
+
+  const frameGroup = svgEl("g", { id: "front-frame" });
+  const left = frontCellCenter(1, 1).x - PITCH / 2;
+  const right = frontCellCenter(1, FILE_MAX).x + PITCH / 2;
+  for (const x of [left, right]) {
+    frameGroup.appendChild(svgEl("line", {
+      x1: x, y1: frontBoundaryY(0), x2: x, y2: frontBoundaryY(LEVEL_MAX),
+      stroke: PERIMETER_COLOR, "stroke-width": 3,
+    }));
+  }
+  // Drawn after the side edges so the highlighted boundaries paint over them.
+  for (let boundaryIndex = 0; boundaryIndex <= LEVEL_MAX; boundaryIndex++) {
+    const y = frontBoundaryY(boundaryIndex);
+    const line = svgEl("line", {
+      x1: left, y1: y, x2: right, y2: y,
+      stroke: perimeterStroke(boundaryIndex, getLevel()),
+      "stroke-width": 3,
+      "stroke-linecap": "square",
+    });
+    floorPolys.push({ el: line, boundaryIndex });
+    frameGroup.appendChild(line);
+  }
+  frontViewEl.appendChild(frameGroup);
+
+  frontPiecesEl = svgEl("g", { id: "front-pieces" });
+  frontViewEl.appendChild(frontPiecesEl);
+  return frontViewEl;
 };
 
 const NOT_IMPLEMENTED_COLOR = "#33cc33";
@@ -616,6 +717,7 @@ export const buildScene = () => {
   checkerPolys = [];
   floorPolys = [];
   verticalHighlightEls = [];
+  diagGroupEls = [];
 
   const bbox = { minX: Infinity, minY: Infinity, maxX: -Infinity, maxY: -Infinity };
 
@@ -626,6 +728,8 @@ export const buildScene = () => {
   cubeGroupEl.appendChild(buildDiagSquares());
   cubeGroupEl.appendChild(buildFrame(bbox));
   svg.appendChild(cubeGroupEl);
+
+  svg.appendChild(buildFrontView(bbox));
 
   notImplementedEl = buildNotImplemented(bbox);
   svg.appendChild(notImplementedEl);

@@ -116,14 +116,16 @@ try {
 
   // The view-option widget has one click target per row, in order Cube,
   // Front, Top, Side (see buildViewOption in src/display/widgets/viewOption.ts).
-  // Picking Front should relabel the caption's red #view-label, hide the
-  // #cube group, and show the #not-implemented placeholder — without moving
-  // any widget. Picking Cube again should restore the cube.
+  // Picking Front should relabel the caption's red #view-label and swap the
+  // #cube group for #front-view (rank 1 seen straight on), without moving
+  // any widget; its piece icons must be the same size as the cube's. Top
+  // isn't drawn yet, so it shows the #not-implemented placeholder.
   const viewRows = page.locator('#view-option rect[style*="cursor: pointer"]');
-  const sceneDisplay = () => page.evaluate(() => ({
-    cube: document.getElementById("cube").getAttribute("display"),
-    placeholder: document.getElementById("not-implemented").getAttribute("display"),
-  }));
+  const sceneDisplay = () => page.evaluate(() => Object.fromEntries(
+    ["cube", "front-view", "not-implemented"].map((id) =>
+      [id, document.getElementById(id).getAttribute("display")])));
+  const showsOnly = (display, id) =>
+    Object.entries(display).every(([k, v]) => v === (k === id ? "inline" : "none"));
   const widgetBoxes = () => page.evaluate(() =>
     ["level-focus-widget", "diag-toggle", "view-option", "caption"].map((id) => {
       const r = document.getElementById(id).getBoundingClientRect();
@@ -131,21 +133,40 @@ try {
       // debug readout), which isn't a move.
       return `${id}:${r.x.toFixed(1)},${r.y.toFixed(1)}`;
     }).join(" "));
+  // On-screen size of the first piece icon in a view's group.
+  const iconSize = (sel) => page.evaluate((sel) => {
+    const r = document.querySelector(sel).getBoundingClientRect();
+    return `${r.width.toFixed(1)}x${r.height.toFixed(1)}`;
+  }, sel);
+  const cubeIconSize = await iconSize("#cube > g[transform]");
   const viewLabelBefore = await page.textContent("#view-label");
   const boxesBefore = await widgetBoxes();
   await viewRows.nth(1).click();
   const viewLabelFront = await page.textContent("#view-label");
   const displayFront = await sceneDisplay();
   const boxesFront = await widgetBoxes();
-  console.log(`view label: ${viewLabelBefore} -> ${viewLabelFront}; cube: ${displayFront.cube}, placeholder: ${displayFront.placeholder}`);
-  if (viewLabelBefore !== "Cube View" || viewLabelFront !== "Front View"
-      || displayFront.cube !== "none" || displayFront.placeholder !== "inline") {
-    console.error("FAIL: selecting Front View did not swap the cube for the placeholder");
+  console.log(`view label: ${viewLabelBefore} -> ${viewLabelFront}; display ${JSON.stringify(displayFront)}`);
+  if (viewLabelBefore !== "Cube View" || viewLabelFront !== "Front View" || !showsOnly(displayFront, "front-view")) {
+    console.error("FAIL: selecting Front View did not swap the cube for the front view");
     exitCode = 1;
   }
   console.log(`widgets unmoved: ${boxesBefore === boxesFront}`);
   if (boxesBefore !== boxesFront) {
     console.error(`FAIL: widgets moved\n  before: ${boxesBefore}\n  after:  ${boxesFront}`);
+    exitCode = 1;
+  }
+  const frontCounts = await page.evaluate(() => ({
+    cells: document.querySelectorAll("#front-checkers rect").length,
+    pieces: document.querySelectorAll("#front-pieces > g").length,
+  }));
+  const frontIconSize = await iconSize("#front-pieces > g");
+  console.log(`front view: ${frontCounts.cells} cells, ${frontCounts.pieces} pieces; icon size cube ${cubeIconSize}, front ${frontIconSize}`);
+  if (frontCounts.cells !== 25 || frontCounts.pieces !== 25) {
+    console.error("FAIL: front view should show 25 rank-1 cells and 25 pieces");
+    exitCode = 1;
+  }
+  if (cubeIconSize !== frontIconSize) {
+    console.error("FAIL: front-view icons are not the same size as cube-view icons");
     exitCode = 1;
   }
 
@@ -174,14 +195,42 @@ try {
   const CUBE_INIT = { view: "cube-view", perspective: "all", level: 1, rank: 4, file: 1, show3dDiagonals: false };
   await checkState("front after reset", FRONT_INIT);
 
+  // The front view has its own diag overlay, shown by the same toggle, in
+  // the same colors as the cube's. Toggled back off afterwards so the
+  // state checks below are unaffected.
+  const frontDiag = () => page.evaluate(() => {
+    const g = document.getElementById("front-diag-squares");
+    const rects = [...g.querySelectorAll("rect")];
+    return { display: g.getAttribute("display"), count: rects.length,
+      colors: [...new Set(rects.map((r) => r.getAttribute("stroke")))] };
+  });
+  const frontDiagOff = await frontDiag();
+  await page.locator('#diag-toggle rect[style*="cursor: pointer"]').click();
+  const frontDiagOn = await frontDiag();
+  console.log(`front diag overlay: ${frontDiagOff.display} -> ${frontDiagOn.display}; ${frontDiagOn.count} squares; colors ${frontDiagOn.colors.join(" | ")}`);
+  if (frontDiagOff.display !== "none" || frontDiagOn.display !== "inline" || frontDiagOn.count !== 25
+      || JSON.stringify([...frontDiagOn.colors].sort()) !== JSON.stringify([...diagColors].sort())) {
+    console.error("FAIL: diag toggle did not show the front view's diag squares in the cube's colors");
+    exitCode = 1;
+  }
+  await page.screenshot({ path: path.join(outDir, "screenshot-front-diag-on.png") });
+  console.log(`screenshot: ${path.join(outDir, "screenshot-front-diag-on.png")}`);
+  await page.locator('#diag-toggle rect[style*="cursor: pointer"]').click();
+
   await page.locator('#level-focus-widget rect[style*="cursor: pointer"]').first().click();
   await viewRows.nth(2).click();
   await checkState("top (no initial state)", { ...FRONT_INIT, view: "top-view", level: 4 });
+  const displayTop = await sceneDisplay();
+  console.log(`top view display: ${JSON.stringify(displayTop)}`);
+  if (!showsOnly(displayTop, "not-implemented")) {
+    console.error("FAIL: Top View should show only the not-implemented placeholder");
+    exitCode = 1;
+  }
 
   await viewRows.nth(0).click();
   const displayCube = await sceneDisplay();
-  console.log(`view label after re-selecting cube: ${await page.textContent("#view-label")}; cube: ${displayCube.cube}, placeholder: ${displayCube.placeholder}`);
-  if (displayCube.cube !== "inline" || displayCube.placeholder !== "none") {
+  console.log(`view label after re-selecting cube: ${await page.textContent("#view-label")}; display ${JSON.stringify(displayCube)}`);
+  if (!showsOnly(displayCube, "cube")) {
     console.error("FAIL: re-selecting Cube View did not restore the cube");
     exitCode = 1;
   }
