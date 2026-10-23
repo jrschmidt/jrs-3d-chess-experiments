@@ -18,13 +18,28 @@ export interface DisplayState {
   show3dDiagonals: boolean;
 }
 
-const initDisplayState: Readonly<DisplayState> = {
-  view: 'cube-view',
-  perspective: 'all',
-  level: 1,
-  rank: 4,
-  file: 1,
-  show3dDiagonals: false,
+// Initial display state for each view, added one view at a time. Every
+// entry is a complete DisplayState; views without one yet are just absent.
+// 'cube-view' is required, since it's the state displayState starts in.
+const initDisplayStates: Readonly<
+  { 'cube-view': DisplayState } & Partial<Record<ViewName, DisplayState>>
+> = {
+  'cube-view': {
+    view: 'cube-view',
+    perspective: 'all',
+    level: 1,
+    rank: 4,
+    file: 1,
+    show3dDiagonals: false,
+  },
+  'front-white': {
+    view: 'front-white',
+    perspective: 'white',
+    level: 3,
+    rank: 1,
+    file: 3,
+    show3dDiagonals: false,
+  },
 };
 
 // Private: read and written only through the accessors below.
@@ -40,9 +55,9 @@ export const setDisplayState = (state: DisplayState): void => {
 // A copy of the whole state, so callers can't modify displayState itself.
 export const getDisplayState = (): DisplayState => ({ ...displayState });
 
-// Can be called again later to reset to the initial values.
+// Can be called again later to reset to the initial (cube-view) values.
 export const setInitDisplayState = (): void => {
-  setDisplayState(initDisplayState);
+  setDisplayState(initDisplayStates['cube-view']);
 };
 
 export const getView =(): ViewName => displayState.view;
