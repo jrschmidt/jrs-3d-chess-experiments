@@ -58,21 +58,21 @@ CWD. It:
 4. Confirms the diagonal overlay (`#diag-squares`) starts hidden, clicks the
    diag toggle, confirms it shows, and prints its distinct stroke colors;
    screenshots `screenshot-diag-on.png`.
-5. Clicks "Front View" in the view-option widget and confirms the caption's
-   red `#view-label` reads "Front View", only the `#front-view` group (rank 1
-   seen straight on) is shown, and no widget (or the caption) moved. Checks
-   it has 25 cells and 25 piece icons, and that its icons are the same
-   on-screen size as the cube's; screenshots `screenshot-front-view.png`.
-   Confirms the switch reset
-   displayState (read from `#display-state-debug`) to front-white's initial
-   state and that the LEVEL numeral and diag toggle show it. Toggles the
-   diagonals on, confirming `#front-diag-squares` shows 25 squares in the
-   cube overlay's colors (screenshots `screenshot-front-diag-on.png`), then
-   off again. Steps the level
-   up and clicks "Top View" (no initial state), confirming only `view`
-   changed and only the `#not-implemented` placeholder is shown. Then clicks
-   "Cube View" and confirms only `#cube` is shown and state/widgets reset to
-   cube-view's initial state.
+5. For each slice view (Front, Top, Side, in that order): steps the level
+   up, then clicks the view in the view-option widget. Confirms the caption's
+   red `#view-label` names it, only its group (`#front-view`, `#top-view`,
+   `#side-view`) is shown, and no widget (or the caption) moved. Checks
+   its cell and piece counts (Front 25/25, Top 40/20, Side 40/20), and that
+   its icons are the same on-screen size as the cube's. Confirms displayState
+   (read from `#display-state-debug`) was reset to the view's initial state
+   and that the LEVEL numeral and diag toggle show it. Screenshots
+   `screenshot-<front|top|side>-view.png`. Then toggles the diagonals on,
+   confirming `#<front|top|side>-diag-squares` shows one square per cell in
+   the cube overlay's colors (screenshots `screenshot-<view>-diag-on.png`),
+   and off again. Finally clicks "Cube View" and confirms only `#cube` is
+   shown and state/widgets reset to cube-view's initial state.
+   `#not-implemented` (front-black, side-black) can't be reached from the
+   view widget, so it's only checked to be hidden.
 6. Prints any browser console/page errors and exits non-zero if there were
    any, or if any check above failed.
 7. Kills its own server on exit (success, failure, or Ctrl-C).
@@ -88,14 +88,13 @@ focus level: 1 -> 2
 diag overlay display (before toggle): none
 diag overlay display (after toggle): inline
 diag square colors (hex): #1953ff | #b300b3 | #b34100 | #178217
-view label: Cube View -> Front View; display {"cube":"none","front-view":"inline","not-implemented":"none"}
-widgets unmoved: true
-front view: 25 cells, 25 pieces; icon size cube 44.1x44.1, front 44.1x44.1
+front: view label Front View; display {"cube":"none","front-view":"inline","side-view":"none","top-view":"none","not-implemented":"none"}
+front: 25 cells, 25 pieces; icon size cube 44.1x44.1, front 44.1x44.1; widgets unmoved: true
 front after reset: state {"view":"front-white",...,"level":3,...}; widgets level 3, diag OFF
 front diag overlay: none -> inline; 25 squares; colors #1953ff | #b300b3 | #178217 | #b34100
-top (no initial state): state {"view":"top-view",...,"level":4,...}; widgets level 4, diag OFF
-top view display: {"cube":"none","front-view":"none","not-implemented":"inline"}
-view label after re-selecting cube: Cube View; display {"cube":"inline","front-view":"none","not-implemented":"none"}
+top: ... (40 cells, 20 pieces; level 5)
+side: ... (40 cells, 20 pieces; level 3)
+view label after re-selecting cube: Cube View; display {"cube":"inline",...}
 cube after reset: state {"view":"cube-view",...,"level":1,...}; widgets level 1, diag OFF
 no console errors
 ```
@@ -128,8 +127,8 @@ No test suite exists in this repo.
   - `#diag-toggle`: a single match.
   - `#view-option`: one per row, in order Cube, Front, Top, Side.
 - **The caption is HTML, not SVG.** `#caption` in `index.html` holds the
-  static text plus `#view-label` and the debug readout. The SVG's `#cube`,
-  `#front-view` and `#not-implemented` groups, by contrast, are toggled via their
+  static text plus `#view-label` and the debug readout. The SVG's view groups
+  (`#cube`, `#front-view`, `#top-view`, `#side-view`, `#not-implemented`), by contrast, are toggled via their
   `display` attribute.
 - **Spawn the vite binary directly, not `npx vite`/`npm run dev`.** The
   driver kills its child on exit; with an npm/npx wrapper in between, the

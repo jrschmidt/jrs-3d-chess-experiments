@@ -116,13 +116,18 @@ try {
 
   // The view-option widget has one click target per row, in order Cube,
   // Front, Top, Side (see buildViewOption in src/display/widgets/viewOption.ts).
-  // Picking Front should relabel the caption's red #view-label and swap the
-  // #cube group for #front-view (rank 1 seen straight on), without moving
-  // any widget; its piece icons must be the same size as the cube's. Top
-  // isn't drawn yet, so it shows the #not-implemented placeholder.
+  // Front, Top and Side are slice views (one slice of the cube seen straight
+  // on — see SLICE_VIEWS in src/display/drawCube/drawCube.ts). Picking one
+  // should relabel the caption's red #view-label, show only that view's
+  // group, reset displayState to its initial state (initDisplayStates in
+  // src/display/displayState.ts, also shown by the level widget and diag
+  // toggle), and move no widget. Its piece icons must be the same size as
+  // the cube's, and the diag toggle must show its own overlay in the cube
+  // overlay's colors.
   const viewRows = page.locator('#view-option rect[style*="cursor: pointer"]');
+  const diagButton = page.locator('#diag-toggle rect[style*="cursor: pointer"]');
   const sceneDisplay = () => page.evaluate(() => Object.fromEntries(
-    ["cube", "front-view", "not-implemented"].map((id) =>
+    ["cube", "front-view", "side-view", "top-view", "not-implemented"].map((id) =>
       [id, document.getElementById(id).getAttribute("display")])));
   const showsOnly = (display, id) =>
     Object.entries(display).every(([k, v]) => v === (k === id ? "inline" : "none"));
@@ -138,45 +143,6 @@ try {
     const r = document.querySelector(sel).getBoundingClientRect();
     return `${r.width.toFixed(1)}x${r.height.toFixed(1)}`;
   }, sel);
-  const cubeIconSize = await iconSize("#cube > g[transform]");
-  const viewLabelBefore = await page.textContent("#view-label");
-  const boxesBefore = await widgetBoxes();
-  await viewRows.nth(1).click();
-  const viewLabelFront = await page.textContent("#view-label");
-  const displayFront = await sceneDisplay();
-  const boxesFront = await widgetBoxes();
-  console.log(`view label: ${viewLabelBefore} -> ${viewLabelFront}; display ${JSON.stringify(displayFront)}`);
-  if (viewLabelBefore !== "Cube View" || viewLabelFront !== "Front View" || !showsOnly(displayFront, "front-view")) {
-    console.error("FAIL: selecting Front View did not swap the cube for the front view");
-    exitCode = 1;
-  }
-  console.log(`widgets unmoved: ${boxesBefore === boxesFront}`);
-  if (boxesBefore !== boxesFront) {
-    console.error(`FAIL: widgets moved\n  before: ${boxesBefore}\n  after:  ${boxesFront}`);
-    exitCode = 1;
-  }
-  const frontCounts = await page.evaluate(() => ({
-    cells: document.querySelectorAll("#front-checkers rect").length,
-    pieces: document.querySelectorAll("#front-pieces > g").length,
-  }));
-  const frontIconSize = await iconSize("#front-pieces > g");
-  console.log(`front view: ${frontCounts.cells} cells, ${frontCounts.pieces} pieces; icon size cube ${cubeIconSize}, front ${frontIconSize}`);
-  if (frontCounts.cells !== 25 || frontCounts.pieces !== 25) {
-    console.error("FAIL: front view should show 25 rank-1 cells and 25 pieces");
-    exitCode = 1;
-  }
-  if (cubeIconSize !== frontIconSize) {
-    console.error("FAIL: front-view icons are not the same size as cube-view icons");
-    exitCode = 1;
-  }
-
-  await page.screenshot({ path: path.join(outDir, "screenshot-front-view.png") });
-  console.log(`screenshot: ${path.join(outDir, "screenshot-front-view.png")}`);
-
-  // Switching to a view with an initial display state (cube-view,
-  // front-white — see initDisplayStates in src/display/displayState.ts)
-  // resets every field to it, and the level widget and diag toggle must
-  // show the reset values. A view without one (Top) changes only `view`.
   const diagLabel = page.locator('#diag-toggle text[dominant-baseline="central"]');
   const debugState = async () => JSON.parse(await page.textContent("#display-state-debug"));
   const checkState = async (name, expected) => {
@@ -191,40 +157,71 @@ try {
       exitCode = 1;
     }
   };
-  const FRONT_INIT = { view: "front-white", perspective: "white", level: 3, rank: 1, file: 3, show3dDiagonals: false };
   const CUBE_INIT = { view: "cube-view", perspective: "all", level: 1, rank: 4, file: 1, show3dDiagonals: false };
-  await checkState("front after reset", FRONT_INIT);
+  const SLICE_CHECKS = [
+    { row: 1, label: "Front View", prefix: "front", cells: 25, pieces: 25,
+      init: { view: "front-white", perspective: "white", level: 3, rank: 1, file: 3, show3dDiagonals: false } },
+    { row: 2, label: "Top View", prefix: "top", cells: 40, pieces: 20,
+      init: { view: "top-view", perspective: "all", level: 5, rank: 4, file: 3, show3dDiagonals: false } },
+    { row: 3, label: "Side View", prefix: "side", cells: 40, pieces: 20,
+      init: { view: "side-white", perspective: "white", level: 3, rank: 4, file: 1, show3dDiagonals: false } },
+  ];
 
-  // The front view has its own diag overlay, shown by the same toggle, in
-  // the same colors as the cube's. Toggled back off afterwards so the
-  // state checks below are unaffected.
-  const frontDiag = () => page.evaluate(() => {
-    const g = document.getElementById("front-diag-squares");
-    const rects = [...g.querySelectorAll("rect")];
-    return { display: g.getAttribute("display"), count: rects.length,
-      colors: [...new Set(rects.map((r) => r.getAttribute("stroke")))] };
-  });
-  const frontDiagOff = await frontDiag();
-  await page.locator('#diag-toggle rect[style*="cursor: pointer"]').click();
-  const frontDiagOn = await frontDiag();
-  console.log(`front diag overlay: ${frontDiagOff.display} -> ${frontDiagOn.display}; ${frontDiagOn.count} squares; colors ${frontDiagOn.colors.join(" | ")}`);
-  if (frontDiagOff.display !== "none" || frontDiagOn.display !== "inline" || frontDiagOn.count !== 25
-      || JSON.stringify([...frontDiagOn.colors].sort()) !== JSON.stringify([...diagColors].sort())) {
-    console.error("FAIL: diag toggle did not show the front view's diag squares in the cube's colors");
-    exitCode = 1;
-  }
-  await page.screenshot({ path: path.join(outDir, "screenshot-front-diag-on.png") });
-  console.log(`screenshot: ${path.join(outDir, "screenshot-front-diag-on.png")}`);
-  await page.locator('#diag-toggle rect[style*="cursor: pointer"]').click();
+  const cubeIconSize = await iconSize("#cube > g[transform]");
+  const boxesBefore = await widgetBoxes();
+  for (const { row, label, prefix, cells, pieces, init } of SLICE_CHECKS) {
+    // Step the level first, so the reset to the view's initial state shows.
+    await page.locator('#level-focus-widget rect[style*="cursor: pointer"]').first().click();
+    await viewRows.nth(row).click();
+    const viewLabel = await page.textContent("#view-label");
+    const display = await sceneDisplay();
+    console.log(`${prefix}: view label ${viewLabel}; display ${JSON.stringify(display)}`);
+    if (viewLabel !== label || !showsOnly(display, `${prefix}-view`)) {
+      console.error(`FAIL: selecting ${label} did not show only #${prefix}-view`);
+      exitCode = 1;
+    }
+    const boxes = await widgetBoxes();
+    if (boxes !== boxesBefore) {
+      console.error(`FAIL: widgets moved in ${label}\n  before: ${boxesBefore}\n  after:  ${boxes}`);
+      exitCode = 1;
+    }
+    const counts = await page.evaluate((prefix) => ({
+      cells: document.querySelectorAll(`#${prefix}-checkers rect`).length,
+      pieces: document.querySelectorAll(`#${prefix}-pieces > g`).length,
+    }), prefix);
+    const size = await iconSize(`#${prefix}-pieces > g`);
+    console.log(`${prefix}: ${counts.cells} cells, ${counts.pieces} pieces; icon size cube ${cubeIconSize}, ${prefix} ${size}; widgets unmoved: ${boxes === boxesBefore}`);
+    if (counts.cells !== cells || counts.pieces !== pieces) {
+      console.error(`FAIL: ${label} should show ${cells} cells and ${pieces} pieces`);
+      exitCode = 1;
+    }
+    if (size !== cubeIconSize) {
+      console.error(`FAIL: ${label} icons are not the same size as cube-view icons`);
+      exitCode = 1;
+    }
+    await checkState(`${prefix} after reset`, init);
+    await page.screenshot({ path: path.join(outDir, `screenshot-${prefix}-view.png`) });
+    console.log(`screenshot: ${path.join(outDir, `screenshot-${prefix}-view.png`)}`);
 
-  await page.locator('#level-focus-widget rect[style*="cursor: pointer"]').first().click();
-  await viewRows.nth(2).click();
-  await checkState("top (no initial state)", { ...FRONT_INIT, view: "top-view", level: 4 });
-  const displayTop = await sceneDisplay();
-  console.log(`top view display: ${JSON.stringify(displayTop)}`);
-  if (!showsOnly(displayTop, "not-implemented")) {
-    console.error("FAIL: Top View should show only the not-implemented placeholder");
-    exitCode = 1;
+    // Toggled back off afterwards so the state checks are unaffected.
+    const viewDiag = () => page.evaluate((prefix) => {
+      const g = document.getElementById(`${prefix}-diag-squares`);
+      const rects = [...g.querySelectorAll("rect")];
+      return { display: g.getAttribute("display"), count: rects.length,
+        colors: [...new Set(rects.map((r) => r.getAttribute("stroke")))] };
+    }, prefix);
+    const diagOff = await viewDiag();
+    await diagButton.click();
+    const diagOn = await viewDiag();
+    console.log(`${prefix} diag overlay: ${diagOff.display} -> ${diagOn.display}; ${diagOn.count} squares; colors ${diagOn.colors.join(" | ")}`);
+    if (diagOff.display !== "none" || diagOn.display !== "inline" || diagOn.count !== cells
+        || JSON.stringify([...diagOn.colors].sort()) !== JSON.stringify([...diagColors].sort())) {
+      console.error(`FAIL: diag toggle did not show ${label}'s diag squares in the cube's colors`);
+      exitCode = 1;
+    }
+    await page.screenshot({ path: path.join(outDir, `screenshot-${prefix}-diag-on.png`) });
+    console.log(`screenshot: ${path.join(outDir, `screenshot-${prefix}-diag-on.png`)}`);
+    await diagButton.click();
   }
 
   await viewRows.nth(0).click();

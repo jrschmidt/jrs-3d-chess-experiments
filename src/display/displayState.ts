@@ -43,6 +43,24 @@ const initDisplayStates: Readonly<
     show3dDiagonals: false,
   },
 
+  'side-white': {
+    view: 'side-white',
+    perspective: 'white',
+    level: 3,
+    rank: 4,
+    file: 1,
+    show3dDiagonals: false,
+  },
+
+  'top-view': {
+    view: 'top-view',
+    perspective: 'all',
+    level: 5,
+    rank: 4,
+    file: 3,
+    show3dDiagonals: false,
+  },
+
 };
 
 // Private: read and written only through the accessors below.
