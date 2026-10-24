@@ -1,4 +1,11 @@
 export type PieceType = 'K' | 'Q' | 'E' | 'R' | 'B' | 'T' | 'N' | 'Z' | 'P';
+
+// Full name of each piece type. E, T and Z are new pieces for this 3D
+// game, not from traditional chess.
+export const PIECE_NAMES: Record<PieceType, string> = {
+  K: 'King', Q: 'Queen', E: 'Eagle', R: 'Rook', B: 'Bishop',
+  T: 'Triton', N: 'Knight', Z: 'Zebra', P: 'Pawn',
+};
 export type PieceColor = 'white' | 'black';
 
 export interface Location {
