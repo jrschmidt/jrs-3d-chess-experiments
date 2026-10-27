@@ -132,7 +132,7 @@ try {
   const showsOnly = (display, id) =>
     Object.entries(display).every(([k, v]) => v === (k === id ? "inline" : "none"));
   const widgetBoxes = () => page.evaluate(() =>
-    ["level-focus-widget", "diag-toggle", "view-option", "caption"].map((id) => {
+    ["level-focus-widget", "rank-focus-widget", "file-focus-widget", "diag-toggle", "view-option", "caption"].map((id) => {
       const r = document.getElementById(id).getBoundingClientRect();
       // Position only: sizes can change with content (e.g. the caption's
       // debug readout), which isn't a move.
@@ -144,20 +144,54 @@ try {
     return `${r.width.toFixed(1)}x${r.height.toFixed(1)}`;
   }, sel);
   const diagLabel = page.locator('#diag-toggle text[dominant-baseline="central"]');
+  const rankNumeral = page.locator('#rank-focus-widget text[dominant-baseline="central"]');
+  const fileNumeral = page.locator('#file-focus-widget text[dominant-baseline="central"]');
   const debugState = async () => JSON.parse(await page.textContent("#display-state-debug"));
   const checkState = async (name, expected) => {
     const state = await debugState();
-    const shown = { level: await numeral.textContent(), diag: await diagLabel.textContent() };
-    const wantShown = { level: String(expected.level), diag: expected.show3dDiagonals ? "ON" : "OFF" };
+    const shown = {
+      level: await numeral.textContent(), rank: await rankNumeral.textContent(),
+      file: await fileNumeral.textContent(), diag: await diagLabel.textContent(),
+    };
+    const wantShown = {
+      level: String(expected.level), rank: String(expected.rank),
+      file: String(expected.file), diag: expected.show3dDiagonals ? "ON" : "OFF",
+    };
     const ok = JSON.stringify(state) === JSON.stringify(expected)
       && JSON.stringify(shown) === JSON.stringify(wantShown);
-    console.log(`${name}: state ${JSON.stringify(state)}; widgets level ${shown.level}, diag ${shown.diag}`);
+    console.log(`${name}: state ${JSON.stringify(state)}; widgets level ${shown.level}, rank ${shown.rank}, file ${shown.file}, diag ${shown.diag}`);
     if (!ok) {
       console.error(`FAIL: ${name} expected state ${JSON.stringify(expected)}, widgets ${JSON.stringify(wantShown)}`);
       exitCode = 1;
     }
   };
   const CUBE_INIT = { view: "cube-view", perspective: "all", level: 1, rank: 4, file: 1, show3dDiagonals: false };
+
+  // The RANK and FILE widgets (same layout as LEVEL: up then down hit
+  // target) change only their own displayState field, clamped to their
+  // range. At this point the cube is at level 2 with diagonals on.
+  const rankArrows = page.locator('#rank-focus-widget rect[style*="cursor: pointer"]');
+  const fileArrows = page.locator('#file-focus-widget rect[style*="cursor: pointer"]');
+  await rankArrows.first().click();
+  await fileArrows.first().click();
+  await checkState("rank/file up", { ...CUBE_INIT, level: 2, show3dDiagonals: true, rank: 5, file: 2 });
+  await fileArrows.nth(1).click();
+  await fileArrows.nth(1).click();
+  await checkState("file down twice (clamped at 1)", { ...CUBE_INIT, level: 2, show3dDiagonals: true, rank: 5, file: 1 });
+
+  // The diag toggle sits at the right, halfway down the page, right-aligned
+  // with the FILE widget.
+  const diagPlacement = await page.evaluate(() => {
+    const d = document.getElementById("diag-toggle").getBoundingClientRect();
+    const f = document.getElementById("file-focus-widget").getBoundingClientRect();
+    return { centerY: d.y + d.height / 2, pageCenterY: window.innerHeight / 2, right: d.right, fileRight: f.right };
+  });
+  console.log(`diag toggle: center y ${diagPlacement.centerY.toFixed(1)} (page ${diagPlacement.pageCenterY}), right ${diagPlacement.right.toFixed(1)} (file widget ${diagPlacement.fileRight.toFixed(1)})`);
+  if (Math.abs(diagPlacement.centerY - diagPlacement.pageCenterY) > 5
+      || Math.abs(diagPlacement.right - diagPlacement.fileRight) > 1) {
+    console.error("FAIL: diag toggle should be halfway down the page, right-aligned with the FILE widget");
+    exitCode = 1;
+  }
   const SLICE_CHECKS = [
     { row: 1, label: "Front View", prefix: "front", cells: 25, pieces: 25,
       init: { view: "front-white", perspective: "white", level: 3, rank: 1, file: 3, show3dDiagonals: false } },

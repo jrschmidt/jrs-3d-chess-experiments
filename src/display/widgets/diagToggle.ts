@@ -4,10 +4,10 @@ import { svgEl } from '../render/svg.ts';
 import { TEXT_STYLE, makePanelRect, makeHitRect, emitDisplayChange } from './widgetChrome.ts';
 
 // Binary on/off control for the diagonal-square overlay, anchored so its
-// left edge sits at anchorLeftX and its vertical midpoint sits at
-// anchorCenterY (the caller passes the focus widget's right edge and
-// vertical center, so it sits alongside it). A 3-line title sits above the
-// clickable button, which itself just reads "ON"/"OFF".
+// right edge sits at anchorRightX and its vertical midpoint sits at
+// anchorCenterY (the caller passes the scene's right edge and vertical
+// center, so it sits at the right, halfway down the page). A 3-line title
+// sits above the clickable button, which itself just reads "ON"/"OFF".
 //
 // The toggle keeps its own on/off value and fires a "show3dDiagonals"
 // display-change event (see emitDisplayChange) on each click. setValue
@@ -15,7 +15,7 @@ import { TEXT_STYLE, makePanelRect, makeHitRect, emitDisplayChange } from './wid
 // displayState) without firing an event.
 const TITLE_LINES = ["SHOW THREE", "DIMENSIONAL", "DIAGONALS"];
 
-export const buildDiagToggle = (anchorLeftX, anchorCenterY, { initial }) => {
+export const buildDiagToggle = (anchorRightX, anchorCenterY, { initial }) => {
   let on = initial;
 
   const W = PITCH * 1.3;
@@ -24,8 +24,8 @@ export const buildDiagToggle = (anchorLeftX, anchorCenterY, { initial }) => {
   const titleH = titleLineHeight * TITLE_LINES.length + PITCH * 0.08;
   const buttonH = PITCH * 0.45;
   const H = titleH + buttonH;
-  const x0 = anchorLeftX;
-  const x1 = anchorLeftX + W;
+  const x0 = anchorRightX - W;
+  const x1 = anchorRightX;
   const y0 = anchorCenterY - H / 2;
   const y1 = anchorCenterY + H / 2;
   const buttonY0 = y0 + titleH;

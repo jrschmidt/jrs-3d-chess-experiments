@@ -5,11 +5,13 @@ import { pieceAt } from '../../gameState/gameState.ts';
 import { LEVEL_MAX, RANK_MAX, FILE_MAX, PITCH } from '../render/constants.ts';
 import { SVG_NS, svgEl } from '../render/svg.ts';
 import { buildLevelFocusWidget } from '../widgets/levelFocusWidget.ts';
+import { buildRankFocusWidget } from '../widgets/rankFocusWidget.ts';
+import { buildFileFocusWidget } from '../widgets/fileFocusWidget.ts';
 import { buildDiagToggle } from '../widgets/diagToggle.ts';
 import { buildViewOption } from '../widgets/viewOption.ts';
 import { DISPLAY_CHANGE, TEXT_STYLE } from '../widgets/widgetChrome.ts';
 import {
-  getDisplayState, getView, getLevel, getShow3dDiagonals,
+  getDisplayState, getView, getLevel, getRank, getFile, getShow3dDiagonals,
   changeView, setPerspective, setLevel, setRank, setFile, setShow3dDiagonals,
 } from '../displayState.ts';
 
@@ -375,6 +377,8 @@ const refreshDisplay = () => {
   notImplementedEl.setAttribute("display", getView() in groups ? "none" : "inline");
   // A view change can reset fields other widgets own, so resync them.
   levelFocusWidgetEl.setValue(getLevel());
+  rankFocusWidgetEl.setValue(getRank());
+  fileFocusWidgetEl.setValue(getFile());
   diagToggleEl.setValue(getShow3dDiagonals());
   showViewStatus();
   showDisplayStateDebug();
@@ -695,10 +699,15 @@ const buildNotImplemented = (bbox) => {
   return g;
 };
 
-// The focus-level widget and diagonal toggle, anchored at the cube's
-// bottom-right corner — so bbox must already cover the whole cube — plus
-// the view selector at the cube's left.
+// The level, rank and file focus widgets, in a row starting at the cube's
+// bottom-right corner — so bbox must already cover the whole cube — then
+// the diagonal toggle at the right, halfway down, and the view selector at
+// the cube's left.
 const buildControls = (svg, bbox) => {
+  // Halfway down the page: the viewBox is centered vertically on the page,
+  // and no widget extends the bbox vertically past the cube.
+  const centerY = (bbox.minY + bbox.maxY) / 2;
+
   const widget = buildLevelFocusWidget(bbox.maxX, bbox.maxY, {
     initial: getLevel(),
     min: 1,
@@ -708,8 +717,31 @@ const buildControls = (svg, bbox) => {
   mergeBounds(bbox, widget);
   levelFocusWidgetEl = widget;
 
-  const diagToggleGap = PITCH * 0.2;
-  const diagToggle = buildDiagToggle(widget.maxX + diagToggleGap, (widget.minY + widget.maxY) / 2, {
+  // Each focus widget is anchored at its bottom-center, a gap to the right
+  // of the previous one.
+  const focusGap = PITCH * 0.2;
+  const nextAnchorX = (prev) => prev.maxX + focusGap + (prev.maxX - prev.minX) / 2;
+
+  const rankWidget = buildRankFocusWidget(nextAnchorX(widget), bbox.maxY, {
+    initial: getRank(),
+    min: 1,
+    max: RANK_MAX,
+  });
+  svg.appendChild(rankWidget.el);
+  mergeBounds(bbox, rankWidget);
+  rankFocusWidgetEl = rankWidget;
+
+  const fileWidget = buildFileFocusWidget(nextAnchorX(rankWidget), bbox.maxY, {
+    initial: getFile(),
+    min: 1,
+    max: FILE_MAX,
+  });
+  svg.appendChild(fileWidget.el);
+  mergeBounds(bbox, fileWidget);
+  fileFocusWidgetEl = fileWidget;
+
+  // Right-aligned with the file widget, the scene's rightmost point.
+  const diagToggle = buildDiagToggle(fileWidget.maxX, centerY, {
     initial: getShow3dDiagonals(),
   });
   svg.appendChild(diagToggle.el);
@@ -734,6 +766,8 @@ let viewOptionEl = null;
 
 // Populated by buildControls; refreshDisplay resyncs them to displayState.
 let levelFocusWidgetEl = null;
+let rankFocusWidgetEl = null;
+let fileFocusWidgetEl = null;
 let diagToggleEl = null;
 
 // Shifts the view selector so it's centered horizontally midway between

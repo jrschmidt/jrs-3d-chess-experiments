@@ -58,14 +58,19 @@ CWD. It:
 4. Confirms the diagonal overlay (`#diag-squares`) starts hidden, clicks the
    diag toggle, confirms it shows, and prints its distinct stroke colors;
    screenshots `screenshot-diag-on.png`.
-5. For each slice view (Front, Top, Side, in that order): steps the level
+5. Clicks the RANK and FILE widgets' up arrows, confirming displayState
+   changes only `rank` (4 -> 5) and `file` (1 -> 2) and the numerals show
+   it, then FILE down twice, confirming it stops at 1. Confirms the diag
+   toggle is centered halfway down the page and right-aligned with the FILE
+   widget.
+6. For each slice view (Front, Top, Side, in that order): steps the level
    up, then clicks the view in the view-option widget. Confirms the caption's
    red `#view-label` names it, only its group (`#front-view`, `#top-view`,
    `#side-view`) is shown, and no widget (or the caption) moved. Checks
    its cell and piece counts (Front 25/25, Top 40/20, Side 40/20), and that
    its icons are the same on-screen size as the cube's. Confirms displayState
    (read from `#display-state-debug`) was reset to the view's initial state
-   and that the LEVEL numeral and diag toggle show it. Screenshots
+   and that the LEVEL, RANK and FILE numerals and diag toggle show it. Screenshots
    `screenshot-<front|top|side>-view.png`. Then toggles the diagonals on,
    confirming `#<front|top|side>-diag-squares` shows one square per cell in
    the cube overlay's colors (screenshots `screenshot-<view>-diag-on.png`),
@@ -73,9 +78,9 @@ CWD. It:
    shown and state/widgets reset to cube-view's initial state.
    `#not-implemented` (front-black, side-black) can't be reached from the
    view widget, so it's only checked to be hidden.
-6. Prints any browser console/page errors and exits non-zero if there were
+7. Prints any browser console/page errors and exits non-zero if there were
    any, or if any check above failed.
-7. Kills its own server on exit (success, failure, or Ctrl-C).
+8. Kills its own server on exit (success, failure, or Ctrl-C).
 
 `outDir` defaults to the skill directory itself (screenshots there are
 gitignored); pass a path — e.g. the session scratchpad — to write them
@@ -88,14 +93,17 @@ focus level: 1 -> 2
 diag overlay display (before toggle): none
 diag overlay display (after toggle): inline
 diag square colors (hex): #1953ff | #b300b3 | #b34100 | #178217
+rank/file up: state {...,"rank":5,"file":2,...}; widgets level 2, rank 5, file 2, diag ON
+file down twice (clamped at 1): state {...,"rank":5,"file":1,...}; widgets level 2, rank 5, file 1, diag ON
+diag toggle: center y 500.3 (page 500), right 1353.6 (file widget 1353.6)
 front: view label Front View; display {"cube":"none","front-view":"inline","side-view":"none","top-view":"none","not-implemented":"none"}
-front: 25 cells, 25 pieces; icon size cube 44.1x44.1, front 44.1x44.1; widgets unmoved: true
-front after reset: state {"view":"front-white",...,"level":3,...}; widgets level 3, diag OFF
+front: 25 cells, 25 pieces; icon size cube 42.0x42.0, front 42.0x42.0; widgets unmoved: true
+front after reset: state {"view":"front-white",...,"level":3,...}; widgets level 3, rank 1, file 3, diag OFF
 front diag overlay: none -> inline; 25 squares; colors #1953ff | #b300b3 | #178217 | #b34100
 top: ... (40 cells, 20 pieces; level 5)
 side: ... (40 cells, 20 pieces; level 3)
 view label after re-selecting cube: Cube View; display {"cube":"inline",...}
-cube after reset: state {"view":"cube-view",...,"level":1,...}; widgets level 1, diag OFF
+cube after reset: state {"view":"cube-view",...,"level":1,...}; widgets level 1, rank 4, file 1, diag OFF
 no console errors
 ```
 
@@ -123,7 +131,8 @@ No test suite exists in this repo.
   `fill: rgba(255,255,255,0.001)` (nearly invisible, intentionally) and
   `style="cursor: pointer"` — that inline style is the only reliable
   selector, scoped by the widget's group id:
-  - `#level-focus-widget`: first match is "up", second is "down".
+  - `#level-focus-widget`, `#rank-focus-widget`, `#file-focus-widget`:
+    first match is "up", second is "down".
   - `#diag-toggle`: a single match.
   - `#view-option`: one per row, in order Cube, Front, Top, Side.
 - **The caption is HTML, not SVG.** `#caption` in `index.html` holds the
