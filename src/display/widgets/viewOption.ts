@@ -4,9 +4,9 @@ import { svgEl } from '../render/svg.ts';
 import { TEXT_STYLE, makePanelRect, makeHitRect, emitDisplayChange } from './widgetChrome.ts';
 
 // Selector for the camera view: four options stacked vertically, anchored
-// so its right edge sits at anchorRightX and its bottom at anchorBottomY
-// (the caller passes a point just left of the cube's bottom back-left
-// corner, so the widget sits beside the cube).
+// so its right edge sits at anchorRightX and its vertical midpoint at
+// anchorCenterY (the caller passes a point just left of the diag toggle,
+// halfway down the page, so the widget sits beside it).
 //
 // The widget keeps its own selected option and fires a "view"
 // display-change event (see emitDisplayChange) whenever a different option
@@ -19,7 +19,7 @@ const OPTIONS = [
   { id: "side-white", label: "Side View" },
 ];
 
-export const buildViewOption = (anchorRightX, anchorBottomY, { initial }) => {
+export const buildViewOption = (anchorRightX, anchorCenterY, { initial }) => {
   let value = initial;
 
   const W = PITCH * 1.4;
@@ -27,8 +27,8 @@ export const buildViewOption = (anchorRightX, anchorBottomY, { initial }) => {
   const H = rowH * OPTIONS.length;
   const x0 = anchorRightX - W;
   const x1 = anchorRightX;
-  const y0 = anchorBottomY - H;
-  const y1 = anchorBottomY;
+  const y0 = anchorCenterY - H / 2;
+  const y1 = anchorCenterY + H / 2;
   const textX = x0 + PITCH * 0.15;
 
   const g = svgEl("g", { id: "view-option" });

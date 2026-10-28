@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // Driver for x3d-chess (formerly clc-26-004, the "5x5x8 Cube" isometric SVG
 // visualization): starts the Vite dev server, drives the app with
-// Playwright/Chromium, takes screenshots, exercises the focus-level, diagonal
+// Playwright/Chromium, takes screenshots, exercises the cell picker, diagonal
 // toggle and view-option widgets, and reports console errors.
 //
 // Usage:
@@ -64,18 +64,26 @@ try {
   await page.screenshot({ path: path.join(outDir, "screenshot.png") });
   console.log(`screenshot: ${path.join(outDir, "screenshot.png")}`);
 
-  // Representative interaction: click the focus-level widget's up arrow and
-  // confirm the LEVEL numeral advances (1 -> 2). The two hit-target rects
-  // inside #level-focus-widget are the only elements with a `cursor: pointer`
-  // style; the first is "up", the second is "down" (see buildLevelFocusWidget in
-  // src/display/widgets/levelFocusWidget.ts — up is wired before down).
-  const numeral = page.locator('#level-focus-widget text[dominant-baseline="central"]');
-  const before = await numeral.textContent();
-  await page.locator('#level-focus-widget rect[style*="cursor: pointer"]').first().click();
-  const after = await numeral.textContent();
+  // The cell picker (see buildCellPicker in src/display/widgets/cellPicker.ts)
+  // has one hit target per numeral, the only elements with a `cursor:
+  // pointer` style in its #cell-picker-<field> group, in drawn order: level
+  // 5..1, rank 8..1, file 1..5. pick(field, value) clicks one; shownValue
+  // reads which numeral is highlighted (shown at full opacity).
+  const PICKER_ORDER = { level: [5, 4, 3, 2, 1], rank: [8, 7, 6, 5, 4, 3, 2, 1], file: [1, 2, 3, 4, 5] };
+  const pick = (field, value) =>
+    page.locator(`#cell-picker-${field} rect[style*="cursor: pointer"]`).nth(PICKER_ORDER[field].indexOf(value)).click();
+  const shownValue = (field) => page.evaluate((field) =>
+    [...document.querySelectorAll(`#cell-picker-${field} text`)]
+      .filter((t) => t.getAttribute("opacity") === "1").map((t) => t.textContent).join(","), field);
+
+  // Representative interaction: click the picker's level 2 and confirm the
+  // highlighted LEVEL numeral moves (1 -> 2).
+  const before = await shownValue("level");
+  await pick("level", 2);
+  const after = await shownValue("level");
   console.log(`focus level: ${before} -> ${after}`);
-  if (after === before) {
-    console.error("FAIL: clicking the up arrow did not change the LEVEL numeral");
+  if (before !== "1" || after !== "2") {
+    console.error("FAIL: clicking level 2 in the cell picker did not move the LEVEL highlight from 1 to 2");
     exitCode = 1;
   }
 
@@ -118,10 +126,9 @@ try {
   // Front, Top, Side (see buildViewOption in src/display/widgets/viewOption.ts).
   // Front, Top and Side are slice views (one slice of the cube seen straight
   // on — see SLICE_VIEWS in src/display/drawCube/drawCube.ts). Picking one
-  // should relabel the caption's red #view-label, show only that view's
-  // group, reset displayState to its initial state (initDisplayStates in
-  // src/display/displayState.ts, also shown by the level widget and diag
-  // toggle), and move no widget. Its piece icons must be the same size as
+  // should show only that view's group, reset displayState to its initial
+  // state (initDisplayStates in src/display/displayState.ts, as shown by the
+  // cell picker and diag toggle), and move no widget. Its piece icons must be the same size as
   // the cube's, and the diag toggle must show its own overlay in the cube
   // overlay's colors.
   const viewRows = page.locator('#view-option rect[style*="cursor: pointer"]');
@@ -132,10 +139,9 @@ try {
   const showsOnly = (display, id) =>
     Object.entries(display).every(([k, v]) => v === (k === id ? "inline" : "none"));
   const widgetBoxes = () => page.evaluate(() =>
-    ["level-focus-widget", "rank-focus-widget", "file-focus-widget", "diag-toggle", "view-option", "caption"].map((id) => {
+    ["cell-picker", "diag-toggle", "view-option"].map((id) => {
       const r = document.getElementById(id).getBoundingClientRect();
-      // Position only: sizes can change with content (e.g. the caption's
-      // debug readout), which isn't a move.
+      // Position only: sizes can change with content, which isn't a move.
       return `${id}:${r.x.toFixed(1)},${r.y.toFixed(1)}`;
     }).join(" "));
   // On-screen size of the first piece icon in a view's group.
@@ -144,24 +150,22 @@ try {
     return `${r.width.toFixed(1)}x${r.height.toFixed(1)}`;
   }, sel);
   const diagLabel = page.locator('#diag-toggle text[dominant-baseline="central"]');
-  const rankNumeral = page.locator('#rank-focus-widget text[dominant-baseline="central"]');
-  const fileNumeral = page.locator('#file-focus-widget text[dominant-baseline="central"]');
-  const debugState = async () => JSON.parse(await page.textContent("#display-state-debug"));
+  // displayState isn't shown on the page, so it's checked through the
+  // widgets that show it (the cell picker's highlights and the diag toggle); `view` and `perspective` in `expected` aren't
+  // checked here (the view is checked by which group sceneDisplay shows).
   const checkState = async (name, expected) => {
-    const state = await debugState();
     const shown = {
-      level: await numeral.textContent(), rank: await rankNumeral.textContent(),
-      file: await fileNumeral.textContent(), diag: await diagLabel.textContent(),
+      level: await shownValue("level"), rank: await shownValue("rank"),
+      file: await shownValue("file"), diag: await diagLabel.textContent(),
     };
     const wantShown = {
       level: String(expected.level), rank: String(expected.rank),
       file: String(expected.file), diag: expected.show3dDiagonals ? "ON" : "OFF",
     };
-    const ok = JSON.stringify(state) === JSON.stringify(expected)
-      && JSON.stringify(shown) === JSON.stringify(wantShown);
-    console.log(`${name}: state ${JSON.stringify(state)}; widgets level ${shown.level}, rank ${shown.rank}, file ${shown.file}, diag ${shown.diag}`);
+    const ok = JSON.stringify(shown) === JSON.stringify(wantShown);
+    console.log(`${name}: widgets level ${shown.level}, rank ${shown.rank}, file ${shown.file}, diag ${shown.diag}`);
     if (!ok) {
-      console.error(`FAIL: ${name} expected state ${JSON.stringify(expected)}, widgets ${JSON.stringify(wantShown)}`);
+      console.error(`FAIL: ${name} expected widgets ${JSON.stringify(wantShown)}`);
       exitCode = 1;
     }
   };
@@ -197,18 +201,14 @@ try {
   const EMPTY_CELL = { empty: true, color: null, letter: null, name: null, icon: false };
   await checkCell("rank/file before", { coords: "2, 4, 1", values: "2,4,1", ...EMPTY_CELL, diag: "#b300b3" });
 
-  // The RANK and FILE widgets (same layout as LEVEL: up then down hit
-  // target) change only their own displayState field, clamped to their
-  // range. At this point the cube is at level 2 with diagonals on.
-  const rankArrows = page.locator('#rank-focus-widget rect[style*="cursor: pointer"]');
-  const fileArrows = page.locator('#file-focus-widget rect[style*="cursor: pointer"]');
-  await rankArrows.first().click();
-  await fileArrows.first().click();
-  await checkState("rank/file up", { ...CUBE_INIT, level: 2, show3dDiagonals: true, rank: 5, file: 2 });
-  await fileArrows.nth(1).click();
-  await fileArrows.nth(1).click();
-  await checkState("file down twice (clamped at 1)", { ...CUBE_INIT, level: 2, show3dDiagonals: true, rank: 5, file: 1 });
-  for (let i = 0; i < 3; i++) await rankArrows.first().click();
+  // The picker's RANK and FILE numerals change only their own displayState
+  // field. At this point the cube is at level 2 with diagonals on.
+  await pick("rank", 5);
+  await pick("file", 2);
+  await checkState("rank 5, file 2", { ...CUBE_INIT, level: 2, show3dDiagonals: true, rank: 5, file: 2 });
+  await pick("file", 1);
+  await checkState("file 1", { ...CUBE_INIT, level: 2, show3dDiagonals: true, rank: 5, file: 1 });
+  await pick("rank", 8);
   await checkCell("black Triton at 2,8,1", {
     coords: "2, 8, 1", empty: false, color: "BLACK", letter: "T #000000", name: "Triton", icon: true,
   });
@@ -221,7 +221,7 @@ try {
   const cellPlacement = await page.evaluate(() => {
     const box = (id) => document.getElementById(id).getBoundingClientRect();
     const c = box("cell-display");
-    const overlaps = ["level-focus-widget", "rank-focus-widget", "file-focus-widget", "diag-toggle", "view-option"]
+    const overlaps = ["cell-picker", "diag-toggle", "view-option"]
       .filter((id) => {
         const w = box(id);
         return w.left < c.right && c.left < w.right && w.top < c.bottom && c.top < w.bottom;
@@ -232,17 +232,38 @@ try {
     };
   });
 
-  // The diag toggle sits at the right, halfway down the page, right-aligned
-  // with the FILE widget.
+  // The cell picker sits just right of the cube, below the diag toggle; the
+  // diag toggle sits at the right, halfway down the page, right-aligned with
+  // the picker.
   const diagPlacement = await page.evaluate(() => {
-    const d = document.getElementById("diag-toggle").getBoundingClientRect();
-    const f = document.getElementById("file-focus-widget").getBoundingClientRect();
-    return { centerY: d.y + d.height / 2, pageCenterY: window.innerHeight / 2, right: d.right, fileRight: f.right };
+    const box = (id) => document.getElementById(id).getBoundingClientRect();
+    const d = box("diag-toggle"), p = box("cell-picker");
+    return { centerY: d.y + d.height / 2, pageCenterY: window.innerHeight / 2, right: d.right, bottom: d.bottom,
+      pickerRight: p.right, pickerLeft: p.left, pickerTop: p.top, cubeRight: box("cube").right };
   });
-  console.log(`diag toggle: center y ${diagPlacement.centerY.toFixed(1)} (page ${diagPlacement.pageCenterY}), right ${diagPlacement.right.toFixed(1)} (file widget ${diagPlacement.fileRight.toFixed(1)})`);
+  console.log(`cell picker: left ${diagPlacement.pickerLeft.toFixed(1)} (cube right ${diagPlacement.cubeRight.toFixed(1)}), top ${diagPlacement.pickerTop.toFixed(1)} (diag toggle bottom ${diagPlacement.bottom.toFixed(1)})`);
+  console.log(`diag toggle: center y ${diagPlacement.centerY.toFixed(1)} (page ${diagPlacement.pageCenterY}), right ${diagPlacement.right.toFixed(1)} (cell picker ${diagPlacement.pickerRight.toFixed(1)})`);
+  if (diagPlacement.pickerLeft <= diagPlacement.cubeRight || diagPlacement.pickerTop <= diagPlacement.bottom) {
+    console.error("FAIL: cell picker should be right of the cube and below the diag toggle");
+    exitCode = 1;
+  }
   if (Math.abs(diagPlacement.centerY - diagPlacement.pageCenterY) > 5
-      || Math.abs(diagPlacement.right - diagPlacement.fileRight) > 1) {
-    console.error("FAIL: diag toggle should be halfway down the page, right-aligned with the FILE widget");
+      || Math.abs(diagPlacement.right - diagPlacement.pickerRight) > 1) {
+    console.error("FAIL: diag toggle should be halfway down the page, right-aligned with the cell picker");
+    exitCode = 1;
+  }
+
+  // The view selector sits just left of the diag toggle, centered on the
+  // same height.
+  const viewPlacement = await page.evaluate(() => {
+    const v = document.getElementById("view-option").getBoundingClientRect();
+    const d = document.getElementById("diag-toggle").getBoundingClientRect();
+    return { gap: d.left - v.right, centerY: v.y + v.height / 2, diagCenterY: d.y + d.height / 2 };
+  });
+  console.log(`view option: gap to diag toggle ${viewPlacement.gap.toFixed(1)}, center y ${viewPlacement.centerY.toFixed(1)} (diag toggle ${viewPlacement.diagCenterY.toFixed(1)})`);
+  if (viewPlacement.gap <= 0 || viewPlacement.gap > 30
+      || Math.abs(viewPlacement.centerY - viewPlacement.diagCenterY) > 5) {
+    console.error("FAIL: view option should sit just left of the diag toggle, centered on the same height");
     exitCode = 1;
   }
   const SLICE_CHECKS = [
@@ -258,13 +279,13 @@ try {
   let flatIconSize = null;
   const boxesBefore = await widgetBoxes();
   for (const { row, label, prefix, cells, pieces, init } of SLICE_CHECKS) {
-    // Step the level first, so the reset to the view's initial state shows.
-    await page.locator('#level-focus-widget rect[style*="cursor: pointer"]').first().click();
+    // Change the level first (no view starts at 4), so the reset to the
+    // view's initial state shows.
+    await pick("level", 4);
     await viewRows.nth(row).click();
-    const viewLabel = await page.textContent("#view-label");
     const display = await sceneDisplay();
-    console.log(`${prefix}: view label ${viewLabel}; display ${JSON.stringify(display)}`);
-    if (viewLabel !== label || !showsOnly(display, `${prefix}-view`)) {
+    console.log(`${prefix}: display ${JSON.stringify(display)}`);
+    if (!showsOnly(display, `${prefix}-view`)) {
       console.error(`FAIL: selecting ${label} did not show only #${prefix}-view`);
       exitCode = 1;
     }
@@ -284,8 +305,8 @@ try {
       console.error(`FAIL: ${label} should show ${cells} cells and ${pieces} pieces`);
       exitCode = 1;
     }
-    // The flat views' icons all match; the cube's are shrunk with the cube
-    // (see shrinkCubeToClear in drawCube.ts).
+    // The flat views' icons all match; the cube's shrink with the cube when
+    // it has to clear the cell display (see shrinkCubeToClear in drawCube.ts).
     if (size !== flatIconSize) {
       console.error(`FAIL: ${label} icons are not the same size as the other flat views' icons`);
       exitCode = 1;
@@ -293,8 +314,8 @@ try {
     if (prefix === "front") {
       const ratio = parseFloat(cubeIconSize) / parseFloat(size);
       console.log(`cube/flat icon size ratio: ${ratio.toFixed(3)}`);
-      if (ratio < 0.8 || ratio > 0.9) {
-        console.error("FAIL: cube icons should be about 0.85x the flat views' icons");
+      if (ratio > 1.001) {
+        console.error("FAIL: cube icons should be no larger than the flat views' icons");
         exitCode = 1;
       }
       const cellW = await page.evaluate(() => document.querySelector("#front-checkers rect").getBoundingClientRect().width);
@@ -336,7 +357,7 @@ try {
 
   await viewRows.nth(0).click();
   const displayCube = await sceneDisplay();
-  console.log(`view label after re-selecting cube: ${await page.textContent("#view-label")}; display ${JSON.stringify(displayCube)}`);
+  console.log(`display after re-selecting cube: ${JSON.stringify(displayCube)}`);
   if (!showsOnly(displayCube, "cube")) {
     console.error("FAIL: re-selecting Cube View did not restore the cube");
     exitCode = 1;

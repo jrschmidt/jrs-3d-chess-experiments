@@ -9,3 +9,5 @@ export const RANK_MAX = 8;
 export const FILE_MAX = 5;
 
 export const PITCH = 70;         // world-unit distance between adjacent cell coordinates
+
+export const TILT_DEGREES = 20;  // isometric tilt angle; try other values freely

@@ -2,17 +2,15 @@
 import { PIECE_ICONS } from '../render/pieceIcons.ts';
 import { piecesInDrawOrder } from '../drawOrder.ts';
 import { pieceAt, PIECE_NAMES } from '../../gameState/gameState.ts';
-import { LEVEL_MAX, RANK_MAX, FILE_MAX, PITCH } from '../render/constants.ts';
+import { LEVEL_MAX, RANK_MAX, FILE_MAX, PITCH, TILT_DEGREES } from '../render/constants.ts';
 import { svgEl, parseSvgFragment } from '../render/svg.ts';
-import { buildLevelFocusWidget } from '../widgets/levelFocusWidget.ts';
-import { buildRankFocusWidget } from '../widgets/rankFocusWidget.ts';
-import { buildFileFocusWidget } from '../widgets/fileFocusWidget.ts';
+import { buildCellPicker } from '../widgets/cellPicker.ts';
 import { buildDiagToggle } from '../widgets/diagToggle.ts';
 import { buildViewOption } from '../widgets/viewOption.ts';
 import { buildCellDisplay } from '../widgets/cellDisplay.ts';
 import { DISPLAY_CHANGE, TEXT_STYLE } from '../widgets/widgetChrome.ts';
 import {
-  getDisplayState, getView, getLevel, getRank, getFile, getShow3dDiagonals,
+  getView, getLevel, getRank, getFile, getShow3dDiagonals,
   changeView, setPerspective, setLevel, setRank, setFile, setShow3dDiagonals,
 } from '../displayState.ts';
 
@@ -41,27 +39,6 @@ const CHECKER_COLORS = {
 // displayState.ts. The "focus level" (getLevel) is the level the viewer is
 // currently paying attention to; its checkerboard is shown brightest, with
 // every other level faint.
-
-// Caption label for each view.
-const VIEW_LABELS = {
-  "cube-view": "Cube View",
-  "front-white": "Front View",
-  "front-black": "Front View",
-  "side-white": "Side View",
-  "side-black": "Side View",
-  "top-view": "Top View",
-};
-
-// Updates the caption's red view label.
-const showViewStatus = () => {
-  document.getElementById("view-label").textContent = VIEW_LABELS[getView()];
-};
-
-// TEMP: live readout of displayState in the caption, for debugging.
-const showDisplayStateDebug = () => {
-  document.getElementById("display-state-debug").textContent =
-    JSON.stringify(getDisplayState(), null, 2);
-};
 
 const checkerColor = (level, variant, focus) =>
   CHECKER_COLORS[level === focus ? "focus" : "unfocused"][variant];
@@ -97,7 +74,6 @@ const ICON_HALF = HALF / 2;    // half-cell scale (half width/height of the cell
 const DIAG_SQUARE_MARGIN = 3;      // px gap between a diag square and the cell's outer edge
 const DIAG_SQUARE_STROKE_WIDTH = 3; // px width of the diag square's outline
 
-const TILT_DEGREES = 20; // isometric tilt angle; try other values freely
 const TILT_RAD = TILT_DEGREES * Math.PI / 180;
 const COS_TILT = Math.cos(TILT_RAD);
 const SIN_TILT = Math.sin(TILT_RAD);
@@ -369,13 +345,9 @@ const refreshDisplay = () => {
   }
   notImplementedEl.setAttribute("display", getView() in groups ? "none" : "inline");
   // A view change can reset fields other widgets own, so resync them.
-  levelFocusWidgetEl.setValue(getLevel());
-  rankFocusWidgetEl.setValue(getRank());
-  fileFocusWidgetEl.setValue(getFile());
+  cellPickerEl.setValue({ level: getLevel(), rank: getRank(), file: getFile() });
   diagToggleEl.setValue(getShow3dDiagonals());
   refreshCellDisplay();
-  showViewStatus();
-  showDisplayStateDebug();
 };
 
 // Shows the focus cell (level, rank, file) in the cell display: its focus
@@ -707,93 +679,48 @@ const buildNotImplemented = (bbox) => {
   return g;
 };
 
-// The level, rank and file focus widgets, in a row starting at the cube's
-// bottom-right corner — so bbox must already cover the whole cube — then
-// the diagonal toggle at the right, halfway down, and the view selector at
-// the cube's left.
+// The cell picker just right of the cube, level with its bottom — so bbox
+// must already cover the whole cube — then the diagonal toggle at the
+// right, halfway down, with the view selector just to its left.
 const buildControls = (svg, bbox) => {
   // Halfway down the page: the viewBox is centered vertically on the page,
   // and no widget extends the bbox vertically past the cube.
   const centerY = (bbox.minY + bbox.maxY) / 2;
+  const gap = PITCH * 0.2;
 
-  const widget = buildLevelFocusWidget(bbox.maxX, bbox.maxY, {
-    initial: getLevel(),
-    min: 1,
-    max: LEVEL_MAX,
+  const cellPicker = buildCellPicker(bbox.maxX + gap, bbox.maxY, {
+    initial: { level: getLevel(), rank: getRank(), file: getFile() },
+    checkerColors: CHECKER_COLORS.focus,
+    edgeColor: PERIMETER_COLOR,
+    isDarkCell,
   });
-  svg.appendChild(widget.el);
-  mergeBounds(bbox, widget);
-  levelFocusWidgetEl = widget;
+  svg.appendChild(cellPicker.el);
+  mergeBounds(bbox, cellPicker);
+  cellPickerEl = cellPicker;
 
-  // Each focus widget is anchored at its bottom-center, a gap to the right
-  // of the previous one.
-  const focusGap = PITCH * 0.2;
-  const nextAnchorX = (prev) => prev.maxX + focusGap + (prev.maxX - prev.minX) / 2;
-
-  const rankWidget = buildRankFocusWidget(nextAnchorX(widget), bbox.maxY, {
-    initial: getRank(),
-    min: 1,
-    max: RANK_MAX,
-  });
-  svg.appendChild(rankWidget.el);
-  mergeBounds(bbox, rankWidget);
-  rankFocusWidgetEl = rankWidget;
-
-  const fileWidget = buildFileFocusWidget(nextAnchorX(rankWidget), bbox.maxY, {
-    initial: getFile(),
-    min: 1,
-    max: FILE_MAX,
-  });
-  svg.appendChild(fileWidget.el);
-  mergeBounds(bbox, fileWidget);
-  fileFocusWidgetEl = fileWidget;
-
-  // Right-aligned with the file widget, the scene's rightmost point.
-  const diagToggle = buildDiagToggle(fileWidget.maxX, centerY, {
+  // Right-aligned with the cell picker, the scene's rightmost point.
+  const diagToggle = buildDiagToggle(cellPicker.maxX, centerY, {
     initial: getShow3dDiagonals(),
   });
   svg.appendChild(diagToggle.el);
   mergeBounds(bbox, diagToggle);
   diagToggleEl = diagToggle;
 
-  // The view selector sits left of the cube, its bottom level with the
-  // bottom of the back-left vertical edge (the cube's leftmost point). It's
-  // built just left of the cube so the viewBox reserves room for it, then
-  // centerViewOption slides it to its final spot once the viewBox is set.
-  const backLeft = perimeterCorners(1, -1).backLeft;
-  const viewOption = buildViewOption(backLeft.x - PITCH * 0.4, backLeft.y, {
+  // The view selector sits a gap left of the diag toggle, centered on the
+  // same height.
+  const viewOption = buildViewOption(diagToggle.minX - gap, centerY, {
     initial: getView(),
   });
   svg.appendChild(viewOption.el);
   mergeBounds(bbox, viewOption);
-  viewOptionEl = viewOption;
 };
-
-// Populated by buildControls; used by centerViewOption.
-let viewOptionEl = null;
 
 // Populated by buildScene; refreshCellDisplay updates it.
 let cellDisplayEl = null;
 
 // Populated by buildControls; refreshDisplay resyncs them to displayState.
-let levelFocusWidgetEl = null;
-let rankFocusWidgetEl = null;
-let fileFocusWidgetEl = null;
+let cellPickerEl = null;
 let diagToggleEl = null;
-
-// Shifts the view selector so it's centered horizontally midway between
-// the left edge of the display and the cube's leftmost point. The display's
-// left edge in scene units depends on the window's aspect ratio (the
-// viewBox is letterboxed with "meet"), so this reruns on every resize.
-const centerViewOption = (svg) => {
-  const pt = svg.createSVGPoint();
-  pt.x = svg.getBoundingClientRect().left; pt.y = 0;
-  const displayLeftX = pt.matrixTransform(svg.getScreenCTM().inverse()).x;
-  const cubeLeftX = perimeterCorners(1, -1).backLeft.x;
-  const targetCenterX = (displayLeftX + cubeLeftX) / 2;
-  const builtCenterX = (viewOptionEl.minX + viewOptionEl.maxX) / 2;
-  viewOptionEl.el.setAttribute("transform", `translate(${(targetCenterX - builtCenterX).toFixed(2)}, 0)`);
-};
 
 // Returns the viewBox's top-right corner.
 const fitViewBox = (svg, bbox) => {
@@ -869,12 +796,8 @@ export const buildScene = () => {
   svg.appendChild(cellDisplayEl.el);
   shrinkCubeToClear(cubeBbox, cellDisplayEl.minX - PITCH * 0.3);
 
-  centerViewOption(svg);
   positionCellDisplay(svg);
-  window.addEventListener("resize", () => {
-    centerViewOption(svg);
-    positionCellDisplay(svg);
-  });
+  window.addEventListener("resize", () => positionCellDisplay(svg));
 
   svg.addEventListener(DISPLAY_CHANGE, onDisplayChange);
   refreshDisplay();
