@@ -8,6 +8,8 @@ export type Perspective = 'all' | 'white' | 'black';
 export type LevelValue = null | 1 | 2 | 3 | 4 | 5;
 export type RankValue = null | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8;
 export type FileValue = null | 1 | 2 | 3 | 4 | 5;
+// Which cell-visibility rule (see cellVisibility.ts) is in effect.
+export type CellVisibilityOption = 'all-visible';
 
 export interface DisplayState {
   view: ViewName;
@@ -16,6 +18,7 @@ export interface DisplayState {
   rank: RankValue;
   file: FileValue;
   show3dDiagonals: boolean;
+  cellVisibility: CellVisibilityOption;
 }
 
 // Initial display state for each view, added one view at a time. Every
@@ -32,6 +35,7 @@ const initDisplayStates: Readonly<
     rank: 4,
     file: 1,
     show3dDiagonals: false,
+    cellVisibility: 'all-visible',
   },
 
   'front-white': {
@@ -41,6 +45,7 @@ const initDisplayStates: Readonly<
     rank: 1,
     file: 3,
     show3dDiagonals: false,
+    cellVisibility: 'all-visible',
   },
 
   'side-white': {
@@ -50,6 +55,7 @@ const initDisplayStates: Readonly<
     rank: 4,
     file: 1,
     show3dDiagonals: false,
+    cellVisibility: 'all-visible',
   },
 
   'top-view': {
@@ -59,6 +65,7 @@ const initDisplayStates: Readonly<
     rank: 4,
     file: 3,
     show3dDiagonals: false,
+    cellVisibility: 'all-visible',
   },
 
 };
@@ -105,5 +112,8 @@ export const setFile = (file: FileValue): void => { displayState.file = file; };
 
 export const getShow3dDiagonals = (): boolean => displayState.show3dDiagonals;
 export const setShow3dDiagonals = (show: boolean): void => { displayState.show3dDiagonals = show; };
+
+export const getCellVisibility = (): CellVisibilityOption => displayState.cellVisibility;
+export const setCellVisibility = (option: CellVisibilityOption): void => { displayState.cellVisibility = option; };
 
 setInitDisplayState();
