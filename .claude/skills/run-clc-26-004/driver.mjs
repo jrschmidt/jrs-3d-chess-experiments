@@ -126,8 +126,9 @@ try {
   // Front, Top, Side (see buildViewOption in src/display/widgets/viewOption.ts).
   // Front, Top and Side are slice views (one slice of the cube seen straight
   // on — see SLICE_VIEWS in src/display/drawCube/drawCube.ts). Picking one
-  // should show only that view's group, reset displayState to its initial
-  // state (initDisplayStates in src/display/displayState.ts, as shown by the
+  // should show only that view's group, keep the selected cell but reset
+  // the other displayState fields to the view's initial state
+  // (initDisplayStates in src/display/displayState.ts; checked through the
   // cell picker and diag toggle), and move no widget. Its piece icons must be the same size as
   // the cube's, and the diag toggle must show its own overlay in the cube
   // overlay's colors.
@@ -266,22 +267,25 @@ try {
     console.error("FAIL: view option should sit just left of the diag toggle, centered on the same height");
     exitCode = 1;
   }
+  // The cell picked above (the black Triton at 2,8,1) carries into every
+  // view; it differs from each view's preset cell (front 3,1,3, top 5,4,3,
+  // side 3,4,1, cube 1,4,1), so a reset would show. Diagonals are on going
+  // into Front, and must reset to off. Piece counts are for the carried
+  // planes: rank 8, level 2, file 1.
+  const CARRIED = { level: 2, rank: 8, file: 1 };
   const SLICE_CHECKS = [
-    { row: 1, label: "Front View", prefix: "front", cells: 25, pieces: 25,
-      init: { view: "front-white", perspective: "white", level: 3, rank: 1, file: 3, show3dDiagonals: false } },
-    { row: 2, label: "Top View", prefix: "top", cells: 40, pieces: 20,
-      init: { view: "top-view", perspective: "all", level: 5, rank: 4, file: 3, show3dDiagonals: false } },
-    { row: 3, label: "Side View", prefix: "side", cells: 40, pieces: 20,
-      init: { view: "side-white", perspective: "white", level: 3, rank: 4, file: 1, show3dDiagonals: false } },
+    { row: 1, label: "Front View", prefix: "front", cells: 25, pieces: 25, field: "rank",
+      expected: { view: "front-white", perspective: "white", ...CARRIED, show3dDiagonals: false } },
+    { row: 2, label: "Top View", prefix: "top", cells: 40, pieces: 20, field: "level",
+      expected: { view: "top-view", perspective: "all", ...CARRIED, show3dDiagonals: false } },
+    { row: 3, label: "Side View", prefix: "side", cells: 40, pieces: 20, field: "file",
+      expected: { view: "side-white", perspective: "white", ...CARRIED, show3dDiagonals: false } },
   ];
 
   const cubeIconSize = await iconSize("#cube > g[transform]");
   let flatIconSize = null;
   const boxesBefore = await widgetBoxes();
-  for (const { row, label, prefix, cells, pieces, init } of SLICE_CHECKS) {
-    // Change the level first (no view starts at 4), so the reset to the
-    // view's initial state shows.
-    await pick("level", 4);
+  for (const { row, label, prefix, cells, pieces, field, expected } of SLICE_CHECKS) {
     await viewRows.nth(row).click();
     const display = await sceneDisplay();
     console.log(`${prefix}: display ${JSON.stringify(display)}`);
@@ -325,13 +329,41 @@ try {
         console.error("FAIL: cell display should be one front cell in from the top-right corner, clear of the cube and widgets");
         exitCode = 1;
       }
-      await checkCell("front: white King at 3,1,3", {
-        coords: "3, 1, 3", values: "3,1,3", empty: false, color: "WHITE", letter: "K #ffffff", name: "King", icon: true, diag: null,
+      await checkCell("front: black Triton at 2,8,1, carried", {
+        coords: "2, 8, 1", values: "2,8,1", empty: false, color: "BLACK", letter: "T #000000", name: "Triton", icon: true, diag: null,
       });
     }
-    await checkState(`${prefix} after reset`, init);
+    await checkState(`${prefix} after switching`, expected);
     await page.screenshot({ path: path.join(outDir, `screenshot-${prefix}-view.png`) });
     console.log(`screenshot: ${path.join(outDir, `screenshot-${prefix}-view.png`)}`);
+
+    // The view shows the plane at its own field (front: rank, top: level,
+    // side: file). Moving it by one flips every square's checker parity, so
+    // the first square's fill must change; moving back restores it. In
+    // Front, rank 3 is empty, so its pieces must be redrawn as none.
+    const planeInfo = () => page.evaluate((prefix) => ({
+      fill: document.querySelector(`#${prefix}-checkers rect`).getAttribute("fill"),
+      pieces: document.querySelectorAll(`#${prefix}-pieces > g`).length,
+    }), prefix);
+    const start = expected[field];
+    const atStart = await planeInfo();
+    await pick(field, start + (start < PICKER_ORDER[field].length ? 1 : -1));
+    const moved = await planeInfo();
+    let emptyPieces = null;
+    if (prefix === "front") {
+      await pick("rank", 3);
+      emptyPieces = (await planeInfo()).pieces;
+      await page.screenshot({ path: path.join(outDir, "screenshot-front-rank3.png") });
+      console.log(`screenshot: ${path.join(outDir, "screenshot-front-rank3.png")}`);
+    }
+    await pick(field, start);
+    const back = await planeInfo();
+    console.log(`${prefix} plane (${field}): fill ${atStart.fill} -> ${moved.fill} -> ${back.fill}; pieces ${atStart.pieces} -> ${moved.pieces}${emptyPieces === null ? "" : ` (rank 3: ${emptyPieces})`} -> ${back.pieces}`);
+    if (moved.fill === atStart.fill || back.fill !== atStart.fill || back.pieces !== pieces
+        || (emptyPieces !== null && emptyPieces !== 0)) {
+      console.error(`FAIL: ${label} did not redraw for the ${field} picked`);
+      exitCode = 1;
+    }
 
     // Toggled back off afterwards so the state checks are unaffected.
     const viewDiag = () => page.evaluate((prefix) => {
@@ -349,7 +381,7 @@ try {
       console.error(`FAIL: diag toggle did not show ${label}'s diag squares in the cube's colors`);
       exitCode = 1;
     }
-    if (prefix === "front") await checkCell("front, diagonals on", { diag: "#1953ff" });
+    if (prefix === "front") await checkCell("front, diagonals on", { diag: "#b300b3" });
     await page.screenshot({ path: path.join(outDir, `screenshot-${prefix}-diag-on.png`) });
     console.log(`screenshot: ${path.join(outDir, `screenshot-${prefix}-diag-on.png`)}`);
     await diagButton.click();
@@ -362,10 +394,10 @@ try {
     console.error("FAIL: re-selecting Cube View did not restore the cube");
     exitCode = 1;
   }
-  await checkState("cube after reset", CUBE_INIT);
+  await checkState("cube after switching", { ...CUBE_INIT, ...CARRIED });
   const diagDisplayCube = await page.locator("#diag-squares").getAttribute("display");
   if (diagDisplayCube !== "none") {
-    console.error("FAIL: diag overlay should be hidden after resetting to cube-view");
+    console.error("FAIL: diag overlay should be hidden after switching to cube-view");
     exitCode = 1;
   }
 

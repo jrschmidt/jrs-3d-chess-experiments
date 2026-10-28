@@ -68,24 +68,31 @@ CWD. It:
    the diag toggle is centered halfway down the page and right-aligned with
    the cell picker, and the view-option widget sits just left of it, centered on the
    same height.
-6. For each slice view (Front, Top, Side, in that order): clicks level 4
-   in the cell picker, then clicks the view in the view-option widget. Confirms only its
-   group (`#front-view`, `#top-view`, `#side-view`) is shown and no widget
-   moved. Checks
-   its cell and piece counts (Front 25/25, Top 40/20, Side 40/20), and that
-   its icons match the other flat views' size. In Front it also checks
-   that the cube's icons are no larger than that (the cube shrinks only if
-   it has to clear the cell display). It checks that the cell display sits one front cell in
-   from the page's top-right corner, clear of the cube and every widget,
-   and that it shows the white King at 3,1,3, plus its diag color once
-   diagonals are on. Confirms the cell picker's LEVEL, RANK and FILE
-   highlights and the diag toggle show the view's initial state (displayState isn't shown on the
-   page, so the widgets are the check). Screenshots
-   `screenshot-<front|top|side>-view.png`. Then toggles the diagonals on,
-   confirming `#<front|top|side>-diag-squares` shows one square per cell in
-   the cube overlay's colors (screenshots `screenshot-<view>-diag-on.png`),
-   and off again. Finally clicks "Cube View" and confirms only `#cube` is
-   shown and the widgets reset to cube-view's initial state.
+6. For each slice view (Front, Top, Side, in that order): clicks the view
+   in the view-option widget, carrying in the cell picked in step 5 (the
+   black Triton at 2,8,1, with diagonals on). Confirms only its group
+   (`#front-view`, `#top-view`, `#side-view`) is shown and no widget moved.
+   Checks its cell and piece counts for the carried plane (Front rank 8:
+   25/25, Top level 2: 40/20, Side file 1: 40/20), and that its icons match
+   the other flat views' size. In Front it also checks that the cube's
+   icons are no larger than that (the cube shrinks only if it has to clear
+   the cell display), that the cell display sits one front cell in from the
+   page's top-right corner, clear of the cube and every widget, and that it
+   still shows the Triton at 2,8,1, plus its diag color once diagonals are
+   on. Confirms the cell picker still highlights 2/8/1 (the cell carries
+   over) and the diag toggle is OFF (the other fields reset to the view's
+   initial state; displayState isn't shown on the page, so the widgets are
+   the check). Screenshots `screenshot-<front|top|side>-view.png`. Each
+   view shows the plane at its own field (Front: rank, Top: level, Side:
+   file), so it then picks that field one step over and back, confirming
+   the first square's checker color flips and returns and the piece count
+   returns; in Front it also picks rank 3 (an empty rank), confirming no
+   pieces are drawn (screenshots `screenshot-front-rank3.png`). Then toggles
+   the diagonals on, confirming `#<front|top|side>-diag-squares` shows one
+   square per cell in the cube overlay's colors (screenshots
+   `screenshot-<view>-diag-on.png`), and off again. Finally clicks "Cube
+   View" and confirms only `#cube` is shown, the cell is still 2,8,1 and
+   the diagonals are off.
    `#not-implemented` (front-black, side-black) can't be reached from the
    view widget, so it's only checked to be hidden.
 7. Prints any browser console/page errors and exits non-zero if there were
@@ -112,13 +119,15 @@ view option: gap to diag toggle 15.3, center y 500.0 (diag toggle 500.3)
 front: display {"cube":"none","front-view":"inline","side-view":"none","top-view":"none","not-implemented":"none"}
 front: 25 cells, 25 pieces; icon size cube 41.6x41.6, front 41.6x41.6; widgets unmoved: true
 cube/flat icon size ratio: 1.000
-cell display: top 76.6, right margin 76.6 (front cell 76.6); left 1016.8 vs cube right 982.3; overlaps []
-front after reset: widgets level 3, rank 1, file 3, diag OFF
-front diag overlay: none -> inline; 25 squares; colors #1953ff | #b300b3 | #178217 | #b34100
-top: ... (40 cells, 20 pieces; level 5)
-side: ... (40 cells, 20 pieces; level 3)
+cell display: top 76.6, right margin 76.6 (front cell 76.6); left 1017.2 vs cube right 981.3; overlaps []
+cell display (front: black Triton at 2,8,1, carried): {"coords":"2, 8, 1",...,"name":"Triton","icon":true,"diag":null}
+front after switching: widgets level 2, rank 8, file 1, diag OFF
+front plane (rank): fill #808080 -> #333333 -> #808080; pieces 25 -> 25 (rank 3: 0) -> 25
+front diag overlay: none -> inline; 25 squares; colors #b34100 | #178217 | #b300b3 | #1953ff
+top: ... (40 cells, 20 pieces; level 2)
+side: ... (40 cells, 20 pieces; file 1)
 display after re-selecting cube: {"cube":"inline",...}
-cube after reset: widgets level 1, rank 4, file 1, diag OFF
+cube after switching: widgets level 2, rank 8, file 1, diag OFF
 no console errors
 ```
 
