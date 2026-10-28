@@ -9,7 +9,7 @@ export type LevelValue = null | 1 | 2 | 3 | 4 | 5;
 export type RankValue = null | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8;
 export type FileValue = null | 1 | 2 | 3 | 4 | 5;
 // Which cell-visibility rule (see cellVisibility.ts) is in effect.
-export type CellVisibilityOption = 'all-visible';
+export type CellVisibilityOption = 'all';
 
 export interface DisplayState {
   view: ViewName;
@@ -35,7 +35,7 @@ const initDisplayStates: Readonly<
     rank: 4,
     file: 1,
     show3dDiagonals: false,
-    cellVisibility: 'all-visible',
+    cellVisibility: 'all',
   },
 
   'front-white': {
@@ -45,7 +45,7 @@ const initDisplayStates: Readonly<
     rank: 1,
     file: 3,
     show3dDiagonals: false,
-    cellVisibility: 'all-visible',
+    cellVisibility: 'all',
   },
 
   'side-white': {
@@ -55,7 +55,7 @@ const initDisplayStates: Readonly<
     rank: 4,
     file: 1,
     show3dDiagonals: false,
-    cellVisibility: 'all-visible',
+    cellVisibility: 'all',
   },
 
   'top-view': {
@@ -65,7 +65,7 @@ const initDisplayStates: Readonly<
     rank: 4,
     file: 3,
     show3dDiagonals: false,
-    cellVisibility: 'all-visible',
+    cellVisibility: 'all',
   },
 
 };

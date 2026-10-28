@@ -24,9 +24,9 @@ const SQUARE = PITCH * 1.6;   // the enlarged cell
 const LETTER_COL = PITCH * 0.95;
 const COL_GAP = PITCH * 0.1;
 const COORDS_FONT = PITCH * 0.55;
-const COLOR_FONT = PITCH * 0.14;
+const COLOR_FONT = PITCH * 0.2;
 const TEXT_FONT = PITCH * 0.2;
-const NAME_FONT = PITCH * 0.22;
+const NAME_FONT = PITCH * 0.28;
 const LETTER_FONT = SQUARE * 0.8;     // cap height ~60% of the square
 const DIAG_INSET = 4;
 const DIAG_STROKE = 2;
@@ -63,7 +63,7 @@ export const buildCellDisplay = (anchorRightX, anchorTopY) => {
   });
   const colorEl = text("cell-display-color", {
     x: sqCx, y: colorBaseline, "text-anchor": "middle", "font-size": COLOR_FONT,
-    "letter-spacing": "1",
+    "letter-spacing": "1", "font-weight": "bold",
   });
 
   const squareEl = svgEl("rect", { x: sqX0, y: sqY0, width: SQUARE, height: SQUARE });
@@ -107,6 +107,7 @@ export const buildCellDisplay = (anchorRightX, anchorTopY) => {
 
   const nameEl = text("cell-display-name", {
     x: sqCx, y: nameBaseline, "text-anchor": "middle", "font-size": NAME_FONT,
+    "font-weight": "bold",
   });
 
   const update = ({ level, rank, file, fill, diagColor, piece }) => {
@@ -129,6 +130,7 @@ export const buildCellDisplay = (anchorRightX, anchorTopY) => {
     letterEl.textContent = piece.type;
     letterEl.setAttribute("fill", textColor);
     nameEl.textContent = piece.name;
+    nameEl.setAttribute("fill", textColor);
     iconEl.appendChild(parseSvgFragment(PIECE_ICONS[`${piece.type.toLowerCase()}${piece.color[0]}`]));
   };
 
