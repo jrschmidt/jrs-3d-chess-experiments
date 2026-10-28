@@ -60,7 +60,10 @@ CWD. It:
    screenshots `screenshot-diag-on.png`.
 5. Clicks the RANK and FILE widgets' up arrows, confirming displayState
    changes only `rank` (4 -> 5) and `file` (1 -> 2) and the numerals show
-   it, then FILE down twice, confirming it stops at 1. Confirms the diag
+   it, then FILE down twice, confirming it stops at 1. Checks the cell
+   display (`#cell-display`, top right) shows the focus cell: first an
+   empty cell with its diag color, then, after RANK up x3, the black Triton
+   at 2,8,1 (screenshots `screenshot-cell-black.png`). Confirms the diag
    toggle is centered halfway down the page and right-aligned with the FILE
    widget.
 6. For each slice view (Front, Top, Side, in that order): steps the level
@@ -68,7 +71,12 @@ CWD. It:
    red `#view-label` names it, only its group (`#front-view`, `#top-view`,
    `#side-view`) is shown, and no widget (or the caption) moved. Checks
    its cell and piece counts (Front 25/25, Top 40/20, Side 40/20), and that
-   its icons are the same on-screen size as the cube's. Confirms displayState
+   its icons match the other flat views' size. In Front it also checks
+   that the cube's icons are about 0.85x that (the cube is shrunk to clear
+   the cell display). It checks that the cell display sits one front cell in
+   from the page's top-right corner, clear of the cube and every widget,
+   and that it shows the white King at 3,1,3, plus its diag color once
+   diagonals are on. Confirms displayState
    (read from `#display-state-debug`) was reset to the view's initial state
    and that the LEVEL, RANK and FILE numerals and diag toggle show it. Screenshots
    `screenshot-<front|top|side>-view.png`. Then toggles the diagonals on,
@@ -95,9 +103,12 @@ diag overlay display (after toggle): inline
 diag square colors (hex): #1953ff | #b300b3 | #b34100 | #178217
 rank/file up: state {...,"rank":5,"file":2,...}; widgets level 2, rank 5, file 2, diag ON
 file down twice (clamped at 1): state {...,"rank":5,"file":1,...}; widgets level 2, rank 5, file 1, diag ON
+cell display (black Triton at 2,8,1): {"coords":"2, 8, 1",...,"color":"BLACK","letter":"T #000000","name":"Triton","icon":true,...}
 diag toggle: center y 500.3 (page 500), right 1353.6 (file widget 1353.6)
 front: view label Front View; display {"cube":"none","front-view":"inline","side-view":"none","top-view":"none","not-implemented":"none"}
-front: 25 cells, 25 pieces; icon size cube 42.0x42.0, front 42.0x42.0; widgets unmoved: true
+front: 25 cells, 25 pieces; icon size cube 35.8x35.8, front 42.0x42.0; widgets unmoved: true
+cube/flat icon size ratio: 0.852
+cell display: top 77.3, right margin 77.3 (front cell 77.3); left 1013.6 vs cube right 990.5; overlaps []
 front after reset: state {"view":"front-white",...,"level":3,...}; widgets level 3, rank 1, file 3, diag OFF
 front diag overlay: none -> inline; 25 squares; colors #1953ff | #b300b3 | #178217 | #b34100
 top: ... (40 cells, 20 pieces; level 5)

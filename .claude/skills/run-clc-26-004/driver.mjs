@@ -167,6 +167,36 @@ try {
   };
   const CUBE_INIT = { view: "cube-view", perspective: "all", level: 1, rank: 4, file: 1, show3dDiagonals: false };
 
+  // The cell display (top right) shows the focus cell (level, rank, file):
+  // coordinates, the piece's color, letter (colored like the piece) and
+  // name, its icon or "EMPTY", and the cell's diag color when diagonals
+  // are on.
+  const cellInfo = () => page.evaluate(() => {
+    const el = (id) => document.getElementById(`cell-display-${id}`);
+    const shown = (id) => el(id).getAttribute("display") !== "none";
+    return {
+      coords: el("coords").textContent,
+      values: ["level", "rank", "file"].map((id) => el(id).textContent).join(","),
+      empty: shown("empty"),
+      color: shown("color") ? el("color").textContent : null,
+      letter: shown("letter") ? `${el("letter").textContent} ${el("letter").getAttribute("fill")}` : null,
+      name: shown("name") ? el("name").textContent : null,
+      icon: el("icon").childElementCount > 0,
+      diag: shown("diag") ? el("diag").getAttribute("stroke") : null,
+    };
+  });
+  const checkCell = async (name, expected) => {
+    const info = await cellInfo();
+    console.log(`cell display (${name}): ${JSON.stringify(info)}`);
+    const mismatch = Object.entries(expected).filter(([k, v]) => info[k] !== v);
+    if (mismatch.length) {
+      console.error(`FAIL: cell display (${name}) expected ${JSON.stringify(Object.fromEntries(mismatch))}`);
+      exitCode = 1;
+    }
+  };
+  const EMPTY_CELL = { empty: true, color: null, letter: null, name: null, icon: false };
+  await checkCell("rank/file before", { coords: "2, 4, 1", values: "2,4,1", ...EMPTY_CELL, diag: "#b300b3" });
+
   // The RANK and FILE widgets (same layout as LEVEL: up then down hit
   // target) change only their own displayState field, clamped to their
   // range. At this point the cube is at level 2 with diagonals on.
@@ -178,6 +208,29 @@ try {
   await fileArrows.nth(1).click();
   await fileArrows.nth(1).click();
   await checkState("file down twice (clamped at 1)", { ...CUBE_INIT, level: 2, show3dDiagonals: true, rank: 5, file: 1 });
+  for (let i = 0; i < 3; i++) await rankArrows.first().click();
+  await checkCell("black Triton at 2,8,1", {
+    coords: "2, 8, 1", empty: false, color: "BLACK", letter: "T #000000", name: "Triton", icon: true,
+  });
+  await page.screenshot({ path: path.join(outDir, "screenshot-cell-black.png") });
+  console.log(`screenshot: ${path.join(outDir, "screenshot-cell-black.png")}`);
+
+  // The cell display sits one front-view cell (on screen) in from the
+  // page's top and right edges, right of the shrunken cube, overlapping
+  // no widget.
+  const cellPlacement = await page.evaluate(() => {
+    const box = (id) => document.getElementById(id).getBoundingClientRect();
+    const c = box("cell-display");
+    const overlaps = ["level-focus-widget", "rank-focus-widget", "file-focus-widget", "diag-toggle", "view-option"]
+      .filter((id) => {
+        const w = box(id);
+        return w.left < c.right && c.left < w.right && w.top < c.bottom && c.top < w.bottom;
+      });
+    return {
+      top: c.top, right: window.innerWidth - c.right, left: c.left,
+      cubeRight: box("cube").right, overlaps,
+    };
+  });
 
   // The diag toggle sits at the right, halfway down the page, right-aligned
   // with the FILE widget.
@@ -202,6 +255,7 @@ try {
   ];
 
   const cubeIconSize = await iconSize("#cube > g[transform]");
+  let flatIconSize = null;
   const boxesBefore = await widgetBoxes();
   for (const { row, label, prefix, cells, pieces, init } of SLICE_CHECKS) {
     // Step the level first, so the reset to the view's initial state shows.
@@ -224,14 +278,35 @@ try {
       pieces: document.querySelectorAll(`#${prefix}-pieces > g`).length,
     }), prefix);
     const size = await iconSize(`#${prefix}-pieces > g`);
+    flatIconSize ??= size;
     console.log(`${prefix}: ${counts.cells} cells, ${counts.pieces} pieces; icon size cube ${cubeIconSize}, ${prefix} ${size}; widgets unmoved: ${boxes === boxesBefore}`);
     if (counts.cells !== cells || counts.pieces !== pieces) {
       console.error(`FAIL: ${label} should show ${cells} cells and ${pieces} pieces`);
       exitCode = 1;
     }
-    if (size !== cubeIconSize) {
-      console.error(`FAIL: ${label} icons are not the same size as cube-view icons`);
+    // The flat views' icons all match; the cube's are shrunk with the cube
+    // (see shrinkCubeToClear in drawCube.ts).
+    if (size !== flatIconSize) {
+      console.error(`FAIL: ${label} icons are not the same size as the other flat views' icons`);
       exitCode = 1;
+    }
+    if (prefix === "front") {
+      const ratio = parseFloat(cubeIconSize) / parseFloat(size);
+      console.log(`cube/flat icon size ratio: ${ratio.toFixed(3)}`);
+      if (ratio < 0.8 || ratio > 0.9) {
+        console.error("FAIL: cube icons should be about 0.85x the flat views' icons");
+        exitCode = 1;
+      }
+      const cellW = await page.evaluate(() => document.querySelector("#front-checkers rect").getBoundingClientRect().width);
+      console.log(`cell display: top ${cellPlacement.top.toFixed(1)}, right margin ${cellPlacement.right.toFixed(1)} (front cell ${cellW.toFixed(1)}); left ${cellPlacement.left.toFixed(1)} vs cube right ${cellPlacement.cubeRight.toFixed(1)}; overlaps ${JSON.stringify(cellPlacement.overlaps)}`);
+      if (Math.abs(cellPlacement.top - cellW) > 3 || Math.abs(cellPlacement.right - cellW) > 3
+          || cellPlacement.left <= cellPlacement.cubeRight || cellPlacement.overlaps.length) {
+        console.error("FAIL: cell display should be one front cell in from the top-right corner, clear of the cube and widgets");
+        exitCode = 1;
+      }
+      await checkCell("front: white King at 3,1,3", {
+        coords: "3, 1, 3", values: "3,1,3", empty: false, color: "WHITE", letter: "K #ffffff", name: "King", icon: true, diag: null,
+      });
     }
     await checkState(`${prefix} after reset`, init);
     await page.screenshot({ path: path.join(outDir, `screenshot-${prefix}-view.png`) });
@@ -253,6 +328,7 @@ try {
       console.error(`FAIL: diag toggle did not show ${label}'s diag squares in the cube's colors`);
       exitCode = 1;
     }
+    if (prefix === "front") await checkCell("front, diagonals on", { diag: "#1953ff" });
     await page.screenshot({ path: path.join(outDir, `screenshot-${prefix}-diag-on.png`) });
     console.log(`screenshot: ${path.join(outDir, `screenshot-${prefix}-diag-on.png`)}`);
     await diagButton.click();

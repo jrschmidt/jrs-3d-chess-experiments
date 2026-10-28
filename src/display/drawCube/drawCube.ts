@@ -1,14 +1,15 @@
 // @ts-nocheck
 import { PIECE_ICONS } from '../render/pieceIcons.ts';
 import { piecesInDrawOrder } from '../drawOrder.ts';
-import { pieceAt } from '../../gameState/gameState.ts';
+import { pieceAt, PIECE_NAMES } from '../../gameState/gameState.ts';
 import { LEVEL_MAX, RANK_MAX, FILE_MAX, PITCH } from '../render/constants.ts';
-import { SVG_NS, svgEl } from '../render/svg.ts';
+import { svgEl, parseSvgFragment } from '../render/svg.ts';
 import { buildLevelFocusWidget } from '../widgets/levelFocusWidget.ts';
 import { buildRankFocusWidget } from '../widgets/rankFocusWidget.ts';
 import { buildFileFocusWidget } from '../widgets/fileFocusWidget.ts';
 import { buildDiagToggle } from '../widgets/diagToggle.ts';
 import { buildViewOption } from '../widgets/viewOption.ts';
+import { buildCellDisplay } from '../widgets/cellDisplay.ts';
 import { DISPLAY_CHANGE, TEXT_STYLE } from '../widgets/widgetChrome.ts';
 import {
   getDisplayState, getView, getLevel, getRank, getFile, getShow3dDiagonals,
@@ -237,16 +238,6 @@ const rhombusCorners = (half) => {
   ];
 };
 
-// Parses a snippet of SVG markup (e.g. X_ICON_0) into a detached element
-// that can be appended into the scene.
-const parseSvgFragment = (markup) => {
-  const doc = new DOMParser().parseFromString(
-    `<svg xmlns="${SVG_NS}">${markup}</svg>`,
-    "image/svg+xml"
-  );
-  return doc.documentElement.firstElementChild;
-};
-
 // Draws the icon for a (type, color) piece (e.g. "K"/"black" -> PIECE_ICONS
 // key "kb") centered on `center`, inside `parent`.
 const renderPieceIcon = (type, color, center, parent) => {
@@ -273,6 +264,8 @@ export const renderPieceIcons = () => {
       if (piece) renderPieceIcon(piece.type, piece.color, sliceSquareCenter(config, center, col, row), piecesEl);
     });
   }
+  // The pieces are placed after buildScene's first refresh.
+  refreshCellDisplay();
 };
 
 // Checkerboard parity: a cell is "dark" when rank + level + file is odd.
@@ -380,8 +373,23 @@ const refreshDisplay = () => {
   rankFocusWidgetEl.setValue(getRank());
   fileFocusWidgetEl.setValue(getFile());
   diagToggleEl.setValue(getShow3dDiagonals());
+  refreshCellDisplay();
   showViewStatus();
   showDisplayStateDebug();
+};
+
+// Shows the focus cell (level, rank, file) in the cell display: its focus
+// checker color, its diagonal color when diagonals are on, and its piece.
+const refreshCellDisplay = () => {
+  const level = getLevel(), rank = getRank(), file = getFile();
+  const isCell = level !== null && rank !== null && file !== null;
+  const piece = isCell ? pieceAt({ level, rank, file }) : undefined;
+  cellDisplayEl.update({
+    level, rank, file,
+    fill: isCell ? CHECKER_COLORS.focus[isDarkCell(rank, level, file) ? "dark" : "light"] : null,
+    diagColor: isCell && getShow3dDiagonals() ? DIAG_COLORS[diagForCell(rank, level, file)] : null,
+    piece: piece ? { type: piece.type, color: piece.color, name: PIECE_NAMES[piece.type] } : null,
+  });
 };
 
 // Every widget reports its changes as a display-change event {field, value}
@@ -764,6 +772,9 @@ const buildControls = (svg, bbox) => {
 // Populated by buildControls; used by centerViewOption.
 let viewOptionEl = null;
 
+// Populated by buildScene; refreshCellDisplay updates it.
+let cellDisplayEl = null;
+
 // Populated by buildControls; refreshDisplay resyncs them to displayState.
 let levelFocusWidgetEl = null;
 let rankFocusWidgetEl = null;
@@ -784,12 +795,43 @@ const centerViewOption = (svg) => {
   viewOptionEl.el.setAttribute("transform", `translate(${(targetCenterX - builtCenterX).toFixed(2)}, 0)`);
 };
 
+// Returns the viewBox's top-right corner.
 const fitViewBox = (svg, bbox) => {
   const pad = PITCH * 0.6;
   const vbX = bbox.minX - pad, vbY = bbox.minY - pad;
   const vbW = (bbox.maxX - bbox.minX) + pad * 2, vbH = (bbox.maxY - bbox.minY) + pad * 2;
   svg.setAttribute("viewBox", `${vbX} ${vbY} ${vbW} ${vbH}`);
   svg.setAttribute("preserveAspectRatio", "xMidYMid meet");
+  return { x: vbX + vbW, y: vbY };
+};
+
+// The cell display's margin from the top and right edges of the page.
+const CELL_DISPLAY_MARGIN = PITCH;
+
+// Moves the cell display so it sits CELL_DISPLAY_MARGIN in from the page's
+// top-right corner. It's built that far in from the viewBox's corner, and
+// the page's corner is always at or beyond the viewBox's (the viewBox is
+// letterboxed with "meet"), so this only ever moves it up or right, away
+// from the rest of the scene. Reruns on every resize.
+const positionCellDisplay = (svg) => {
+  const rect = svg.getBoundingClientRect();
+  const pt = svg.createSVGPoint();
+  pt.x = rect.right; pt.y = rect.top;
+  const corner = pt.matrixTransform(svg.getScreenCTM().inverse());
+  const dx = Math.max(0, corner.x - CELL_DISPLAY_MARGIN - cellDisplayEl.maxX);
+  const dy = Math.min(0, corner.y + CELL_DISPLAY_MARGIN - cellDisplayEl.minY);
+  cellDisplayEl.el.setAttribute("transform", `translate(${dx.toFixed(2)}, ${dy.toFixed(2)})`);
+};
+
+// Shrinks the cube about its bottom-left corner, just enough that its right
+// edge clears the cell display's left edge. Everything else is laid out
+// from the unscaled cube, so nothing else moves; the cube's piece icons and
+// diag squares are inside cubeGroupEl, so they shrink with it.
+const shrinkCubeToClear = (cubeBbox, clearX) => {
+  const px = cubeBbox.minX, py = cubeBbox.maxY;
+  const k = Math.min(1, (clearX - px) / (cubeBbox.maxX - px));
+  cubeGroupEl.setAttribute("transform",
+    `translate(${px.toFixed(2)}, ${py.toFixed(2)}) scale(${k.toFixed(4)}) translate(${(-px).toFixed(2)}, ${(-py).toFixed(2)})`);
 };
 
 export const buildScene = () => {
@@ -819,11 +861,20 @@ export const buildScene = () => {
   notImplementedEl = buildNotImplemented(bbox);
   svg.appendChild(notImplementedEl);
 
+  const cubeBbox = { ...bbox };
   buildControls(svg, bbox);
-  fitViewBox(svg, bbox);
+  const vbCorner = fitViewBox(svg, bbox);
+
+  cellDisplayEl = buildCellDisplay(vbCorner.x - CELL_DISPLAY_MARGIN, vbCorner.y + CELL_DISPLAY_MARGIN);
+  svg.appendChild(cellDisplayEl.el);
+  shrinkCubeToClear(cubeBbox, cellDisplayEl.minX - PITCH * 0.3);
 
   centerViewOption(svg);
-  window.addEventListener("resize", () => centerViewOption(svg));
+  positionCellDisplay(svg);
+  window.addEventListener("resize", () => {
+    centerViewOption(svg);
+    positionCellDisplay(svg);
+  });
 
   svg.addEventListener(DISPLAY_CHANGE, onDisplayChange);
   refreshDisplay();
