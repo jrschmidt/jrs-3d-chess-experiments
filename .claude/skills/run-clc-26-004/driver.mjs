@@ -87,6 +87,37 @@ try {
     exitCode = 1;
   }
 
+  // The picker cube draws the selected level's squares in green, the
+  // selected rank's in red and the selected file's in blue, squares on two
+  // of them in a mix and the selected cell (when on the surface) in orange.
+  // Counts per class (L, R, F, LR, LF, RF, LRF) over the 105 face squares,
+  // counted by hand: the top face is all level 5, the front all rank 1 and
+  // the left all file 1.
+  const HIGHLIGHT_FILLS = {
+    L: ["#339933", "#336633"], R: ["#993333", "#663333"], F: ["#333399", "#333366"],
+    LR: ["#999933"], LF: ["#339999"], RF: ["#993399"], LRF: ["#ff8000"],
+  };
+  const pickerHighlights = () => page.evaluate((classes) => {
+    const fills = [...document.querySelectorAll("#cell-picker-faces polygon")].map((p) => p.getAttribute("fill"));
+    return Object.entries(classes)
+      .map(([name, colors]) => `${name} ${fills.filter((f) => colors.includes(f)).length}`).join(", ");
+  }, HIGHLIGHT_FILLS);
+  const HIGHLIGHT_CHECKS = [
+    { cell: "2,4,1", picks: [], expected: "L 4, R 4, F 39, LR 0, LF 8, RF 5, LRF 1" },
+    { cell: "5,4,1", picks: [["level", 5]], expected: "L 32, R 0, F 32, LR 4, LF 15, RF 4, LRF 2" },
+    { cell: "2,4,2", picks: [["level", 2], ["file", 2]], expected: "L 11, R 8, F 11, LR 1, LF 1, RF 1, LRF 0" },
+  ];
+  for (const { cell, picks, expected } of HIGHLIGHT_CHECKS) {
+    for (const [field, value] of picks) await pick(field, value);
+    const got = await pickerHighlights();
+    console.log(`picker highlights at ${cell}: ${got}`);
+    if (got !== expected) {
+      console.error(`FAIL: expected picker highlights at ${cell}: ${expected}`);
+      exitCode = 1;
+    }
+  }
+  await pick("file", 1);
+
   await page.screenshot({ path: path.join(outDir, "screenshot-level2.png") });
   console.log(`screenshot: ${path.join(outDir, "screenshot-level2.png")}`);
 

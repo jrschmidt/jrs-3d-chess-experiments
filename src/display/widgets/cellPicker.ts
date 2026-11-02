@@ -1,5 +1,7 @@
 // @ts-nocheck
-import { PITCH, LEVEL_MAX, RANK_MAX, FILE_MAX, TILT_DEGREES } from '../render/constants.ts';
+import { PITCH, LEVEL_MAX, RANK_MAX, FILE_MAX, TILT_DEGREES,
+  LIGHT_GREEN, DARK_GREEN, LIGHT_RED, DARK_RED, LIGHT_BLUE, DARK_BLUE,
+  GREEN_RED, GREEN_BLUE, RED_BLUE, CELL_HIGHLIGHT } from '../render/constants.ts';
 import { svgEl } from '../render/svg.ts';
 import { TEXT_STYLE, makeHitRect, emitDisplayChange } from './widgetChrome.ts';
 
@@ -19,6 +21,24 @@ import { TEXT_STYLE, makeHitRect, emitDisplayChange } from './widgetChrome.ts';
 // displayState) without firing an event. The caller supplies the checker
 // colors ({ light, dark }), the edge color and the checker parity rule
 // (isDarkCell(rank, level, file)), so the picker matches the main cube.
+// The squares of the selected level are drawn in green instead, those of
+// the selected rank in red and those of the selected file in blue (each
+// with the same parity). Squares on two of them are a solid mix (GREEN_RED,
+// GREEN_BLUE, RED_BLUE), and the selected cell itself, when it's on the
+// surface, is CELL_HIGHLIGHT. The top face is all level LEVEL_MAX, the
+// front face all rank 1 and the left face all file 1, so each turns wholly
+// one color when that level, rank or file is selected.
+
+// Keyed by which of the selected level (L), rank (R) and file (F) a square
+// lies on.
+const solid = (color) => ({ light: color, dark: color });
+const HIGHLIGHT_COLORS = {
+  L: { light: LIGHT_GREEN, dark: DARK_GREEN },
+  R: { light: LIGHT_RED, dark: DARK_RED },
+  F: { light: LIGHT_BLUE, dark: DARK_BLUE },
+  LR: solid(GREEN_RED), LF: solid(GREEN_BLUE), RF: solid(RED_BLUE),
+  LRF: solid(CELL_HIGHLIGHT),
+};
 
 const P = PITCH * 0.33;            // pitch of one cell in the picker
 const NUM_FONT = P * 0.7;
@@ -141,12 +161,13 @@ export const buildCellPicker = (anchorX, anchorBottomY, { initial, checkerColors
   const inner = svgEl("g", { transform: `translate(${dx.toFixed(2)}, ${dy.toFixed(2)})` });
   g.appendChild(inner);
 
+  // Colored by restyle, which knows the selected level, rank and file.
   const faces = svgEl("g", { id: "cell-picker-faces" });
+  const faceEls = [];
   for (const { corners, cell } of faceSquares()) {
-    faces.appendChild(svgEl("polygon", {
-      points: pointsAttr(corners.map(([r, l, f]) => project(r, l, f))),
-      fill: checkerColors[isDarkCell(...cell) ? "dark" : "light"],
-    }));
+    const el = svgEl("polygon", { points: pointsAttr(corners.map(([r, l, f]) => project(r, l, f))) });
+    faces.appendChild(el);
+    faceEls.push({ el, cell });
   }
   inner.appendChild(faces);
 
@@ -209,6 +230,13 @@ export const buildCellPicker = (anchorX, anchorBottomY, { initial, checkerColors
       const selected = values[field] === value;
       highlight.setAttribute("display", selected ? "inline" : "none");
       text.setAttribute("opacity", selected ? 1 : 0.6);
+    }
+    for (const { el, cell } of faceEls) {
+      const [rank, level, file] = cell;
+      const key = (level === values.level ? "L" : "") + (rank === values.rank ? "R" : "")
+        + (file === values.file ? "F" : "");
+      const colors = HIGHLIGHT_COLORS[key] ?? checkerColors;
+      el.setAttribute("fill", colors[isDarkCell(...cell) ? "dark" : "light"]);
     }
   };
   restyle();

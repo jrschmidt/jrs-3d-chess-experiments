@@ -54,8 +54,14 @@ CWD. It:
 2. Launches headless Chromium, waits for `#checkers polygon`, and
    screenshots to `<outDir>/screenshot.png`.
 3. Clicks level 2 in the cell picker (`#cell-picker`, bottom right) and
-   confirms the highlighted LEVEL numeral moves (`1 -> 2`); screenshots
-   `screenshot-level2.png`.
+   confirms the highlighted LEVEL numeral moves (`1 -> 2`). Confirms the
+   picker cube's highlight counts at cells 2,4,1, then 5,4,1 (picks level
+   5) and 2,4,2 (picks level 2, file 2), then picks file 1 again: the
+   selected level's squares in green (`#339933` / `#336633`), rank's in red
+   (`#993333` / `#663333`), file's in blue (`#333399` / `#333366`), squares
+   on two of them in `#999933` (level+rank), `#339999` (level+file) or
+   `#993399` (rank+file), and the selected cell, when on the surface, in
+   `#ff8000`; screenshots `screenshot-level2.png`.
 4. Confirms the diagonal overlay (`#diag-squares`) starts hidden, clicks the
    diag toggle, confirms it shows, and prints its distinct stroke colors;
    screenshots `screenshot-diag-on.png`.
@@ -107,6 +113,9 @@ Sample output from a real run:
 
 ```
 focus level: 1 -> 2
+picker highlights at 2,4,1: L 4, R 4, F 39, LR 0, LF 8, RF 5, LRF 1
+picker highlights at 5,4,1: L 32, R 0, F 32, LR 4, LF 15, RF 4, LRF 2
+picker highlights at 2,4,2: L 11, R 8, F 11, LR 1, LF 1, RF 1, LRF 0
 diag overlay display (before toggle): none
 diag overlay display (after toggle): inline
 diag square colors (hex): #1953ff | #b300b3 | #b34100 | #178217
