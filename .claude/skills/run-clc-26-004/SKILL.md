@@ -1,6 +1,6 @@
 ---
 name: run-clc-26-004
-description: Build, run, and drive the x3d-chess app (formerly clc-26-004, the "5x5x8 Cube" isometric SVG visualization; Vite + TypeScript, sources under src/). Use when asked to start, serve, run, screenshot, or interact with this app, or to verify a change to src/ or index.html actually renders.
+description: Build, run, and drive the Chess 321 app (formerly x3d-chess and clc-26-004, the "5x5x8 Cube" isometric SVG visualization; Vite + TypeScript, sources under src/). Use when asked to start, serve, run, screenshot, or interact with this app, or to verify a change to src/ or index.html actually renders.
 ---
 
 The app is a Vite + TypeScript project: `index.html` loads `src/main.ts`,
@@ -9,7 +9,7 @@ which imports `src/app.ts` (scene in `src/display/`, widgets in
 Playwright driver at `.claude/skills/run-clc-26-004/driver.mjs` — it starts
 the Vite dev server, launches headless Chromium, screenshots the scene,
 exercises each widget, and reports console errors. All paths below are
-relative to the repo root (`x3d-chess/`).
+relative to the repo root (`chess-321/`).
 
 ## Prerequisites
 

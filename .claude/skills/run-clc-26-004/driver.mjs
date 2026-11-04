@@ -1,6 +1,6 @@
 #!/usr/bin/env node
-// Driver for x3d-chess (formerly clc-26-004, the "5x5x8 Cube" isometric SVG
-// visualization): starts the Vite dev server, drives the app with
+// Driver for Chess 321 (formerly x3d-chess and clc-26-004, the "5x5x8 Cube"
+// isometric SVG visualization): starts the Vite dev server, drives the app with
 // Playwright/Chromium, takes screenshots, exercises the cell picker, diagonal
 // toggle and view-option widgets, and reports console errors.
 //
