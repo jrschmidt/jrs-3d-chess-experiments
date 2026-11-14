@@ -37,7 +37,7 @@ Widgets and the scene talk through events:
 
 Other modules:
 
-- `src/gamePlay/gamePlay.ts` holds move computation. So far it defines `LegalMovesList` (`emptyCells: Location[]`, `captures: ChessPiece[]`).
+- `src/gamePlay/gamePlay.ts` holds move computation. So far it defines `LegalMovesList` (`emptyCells: Location[]`, `captures: ChessPiece[]`) and `getLegalMoves(piece)`, a stub that switches on `piece.type` and returns empty lists for now.
 - `src/display/drawOrder.ts` defines `ViewName` and a back-to-front ordering for each view. SVG has no z-index, so DOM append order decides which icons are drawn in front.
 - `src/display/cellVisibility.ts` turns a DisplayState snapshot into a classifier that marks each cell `hidden`, `visible` or `highlighted`, using one rule per `CellVisibilityOption`.
 - `src/display/render/` holds shared constants (`PITCH`, `TILT_DEGREES`, axis maxima, the green/red/blue palette for level/rank/file), helpers for creating SVG elements, and the piece icon SVGs.
