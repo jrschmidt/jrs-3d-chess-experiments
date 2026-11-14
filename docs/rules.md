@@ -26,7 +26,7 @@ In Chess 321, we have been using the convention that the cell with (level, rank,
 ### Capturing
 A piece captures by moving onto a cell occupied by an opposing piece, which is removed from the board. A piece can never move onto a cell occupied by one of its own pieces.
 
-## The Pieces
+## The Pieces and Their Moves
 
 There are nine pieces in Chess 321. Three new pieces are introduced, the eagle, triton and zebra. For each side, white and black, there are 25 pieces and 25 pawns.
 
@@ -72,6 +72,65 @@ The pawns (symbol "P") move in a three dimensional analog of traditional pawns o
 En passant captures are allowed as in traditional chess. If a two-cell move passes through a cell where it could have been captured by an opposing pawn, then the opposing pawn can capture it by moving to the passed over cell, just as if the pawn had only moved one cell forward, provided this move is made immediately after the captured pawn's two-cell leap.
 
 A white pawn reaching the eighth rank, or a black pawn reaching the first rank, is promoted, per the player's choice, to a queen, eagle, rook, bishop, triton, knight or zebra.
+
+### Computing moves in different directions
+Formulas for moves are based on changes to (level, rank, file) / (L,R,F) coordinates. Multiple entries mean using any of the listed formulas will result in a legal move.
+
+(±1, ±2, ±0) means (
+  level = level ± 1
+  rank = rank ± 2
+  file = file
+)
+
+**Notation**
+- `n` is a whole number, n ≥ 1. Within one formula, every `n` has the same value: (±n, ±n, ±0) moves the same distance in level and rank.
+- Each `±` sign is chosen on its own, so (±n, ±n, ±0) stands for four directions.
+- The target cell must be on the board: 1 ≤ L ≤ 5, 1 ≤ R ≤ 8, 1 ≤ F ≤ 5.
+- The target must be empty or hold an opposing piece (see "Capturing").
+
+**Range**
+- King and eagle: n = 1 only (one step in any orthogonal, 2-d diagonal or 3-d diagonal direction).
+- Queen, rook, bishop and triton slide: n = 1, 2, 3, … in a chosen direction, stopping at the board edge or at the first occupied cell. That cell can be captured if it holds an opposing piece.
+- Knight and zebra leap: each formula is one fixed jump, and any pieces in between don't block it.
+
+#### Orthogonal (king, queen, eagle, rook)
+(±n, ±0, ±0)
+(±0, ±n, ±0)
+(±0, ±0, ±n)
+
+#### 2-dimensional diagonal (king, queen, eagle, bishop)
+(±n, ±n, ±0)
+(±n, ±0, ±n)
+(±0, ±n, ±n)
+
+#### Pawn
+Formulas are for white. For black, rank changes the other way (+1 becomes −1, +2 becomes −2).
+
+Move (target must be empty)
+(±0, +1, ±0)
+
+Double move (white from rank 2, black from rank 7; both cells must be empty)
+(±0, +2, ±0)
+
+Capture (2-dimensional diagonal, forward only, left right up or down; target holds an opposing piece, or en passant)
+(±0, +1, ±1)
+(±1, +1, ±0)
+
+#### 3-dimensional diagonal (king, queen, eagle, triton)
+(±n, ±n, ±n)
+
+#### Knight move (Knight)
+(±2, ±1, ±0)
+(±1, ±2, ±0)
+(±2, ±0, ±1)
+(±0, ±2, ±1)
+(±1, ±0, ±2)
+(±0, ±1, ±2)
+
+#### Zebra move (3d analog of knight move)
+(±1, ±1, ±2)
+(±1, ±2, ±1)
+(±2, ±1, ±1)
 
 ## Initial Piece Setup
 *(L,R,F) = (level, rank, file)*
@@ -140,3 +199,6 @@ Each cell on Rank 7 contains a black pawn.
 - **Draw by repetition:** whether repeating a position (e.g., threefold repetition) is a draw.
 - **50-move rule:** whether a game is drawn after a set number of moves with no capture or pawn move.
 - **Insufficient material:** whether a game is drawn when neither side has enough material to checkmate, and which combinations of pieces count as insufficient.
+
+
+
