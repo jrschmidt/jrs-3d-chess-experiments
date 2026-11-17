@@ -13,15 +13,15 @@ export function getLegalMoves(piece: ChessPiece): LegalMovesList {
     case 'K':
       return getKingMoves();
     case 'Q':
-      return getQueenMoves();
+      return getQueenMoves(piece);
     case 'E':
       return getEagleMoves();
     case 'R':
       return getRookMoves(piece);
     case 'B':
-      return getBishopMoves();
+      return getBishopMoves(piece);
     case 'T':
-      return getTritonMoves();
+      return getTritonMoves(piece);
     case 'N':
       return getKnightMoves();
     case 'Z':
@@ -52,6 +52,15 @@ function expandSigns(patterns: readonly Offset[]): Offset[] {
 
 // Orthogonal: (±n, ±0, ±0) (±0, ±n, ±0) (±0, ±0, ±n)
 const ORTHOGONAL = expandSigns([[1, 0, 0], [0, 1, 0], [0, 0, 1]]);
+
+// 2-d diagonal: (±n, ±n, ±0) (±n, ±0, ±n) (±0, ±n, ±n) → 12 directions
+const DIAGONAL_2D = expandSigns([[1, 1, 0], [1, 0, 1], [0, 1, 1]]);
+
+// 3-d diagonal: (±n, ±n, ±n) → 8 directions
+const DIAGONAL_3D = expandSigns([[1, 1, 1]]);
+
+// Orthogonal + 2-d diagonal + 3-d diagonal → all 26 directions
+const ALL_DIRECTIONS = [...ORTHOGONAL, ...DIAGONAL_2D, ...DIAGONAL_3D];
 
 function onBoard({ level, rank, file }: Location): boolean {
   return level >= 1 && level <= LEVEL_MAX
@@ -92,8 +101,8 @@ function getKingMoves(): LegalMovesList {
   return { emptyCells: [], captures: [] };
 }
 
-function getQueenMoves(): LegalMovesList {
-  return { emptyCells: [], captures: [] };
+function getQueenMoves(piece: ChessPiece): LegalMovesList {
+  return slideMoves(piece, ALL_DIRECTIONS);
 }
 
 function getEagleMoves(): LegalMovesList {
@@ -104,12 +113,12 @@ function getRookMoves(piece: ChessPiece): LegalMovesList {
   return slideMoves(piece, ORTHOGONAL);
 }
 
-function getBishopMoves(): LegalMovesList {
-  return { emptyCells: [], captures: [] };
+function getBishopMoves(piece: ChessPiece): LegalMovesList {
+  return slideMoves(piece, DIAGONAL_2D);
 }
 
-function getTritonMoves(): LegalMovesList {
-  return { emptyCells: [], captures: [] };
+function getTritonMoves(piece: ChessPiece): LegalMovesList {
+  return slideMoves(piece, DIAGONAL_3D);
 }
 
 function getKnightMoves(): LegalMovesList {
