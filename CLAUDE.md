@@ -27,7 +27,7 @@ The entry point is `index.html` (a single `<svg id="scene">`), which loads `src/
 
 There are two kinds of state, and they live in separate places:
 
-- **Gameplay state** is in `src/gameState/gameState.ts`: the list of pieces, plus a `piecesByCell` index keyed `"level,rank,file"`, kept in sync by `placeGamePiece`/`removeGamePiece`/`resetGameState`. Look pieces up with `pieceAt(location)`. This directory holds gameplay state only; render and UI state never goes here.
+- **Gameplay state** is in `src/gameState/gameState.ts`: the list of pieces, plus a `piecesByCell` index keyed `"level,rank,file"`, kept in sync by `placeGamePiece`/`removeGamePiece`/`resetGameState`. Look pieces up with `pieceAt(location)`. It also defines the board size, `LEVEL_MAX`/`RANK_MAX`/`FILE_MAX`. This directory holds gameplay state only; render and UI state never goes here.
 - **Display state** is in `src/display/displayState.ts`: the view, perspective, focus `level`/`rank`/`file` (the selected cell), `show3dDiagonals` and `cellVisibility`. It's a private object, read and written only through the getters and setters. `changeView(view)` resets every field to that view's entry in `initDisplayStates` but keeps the selected cell. A setter changes only its own field. Add a cross-field rule only when the user asks for that specific rule.
 
 Widgets and the scene talk through events:
@@ -37,10 +37,10 @@ Widgets and the scene talk through events:
 
 Other modules:
 
-- `src/gamePlay/gamePlay.ts` holds move computation. So far it defines `LegalMovesList` (`emptyCells: Location[]`, `captures: ChessPiece[]`) and `getLegalMoves(piece)`, a stub that switches on `piece.type` and returns empty lists for now.
+- `src/gamePlay/gamePlay.ts` holds move computation. So far it defines `LegalMovesList` (`emptyCells: Location[]`, `captures: ChessPiece[]`) and `getLegalMoves(piece)`, which switches on `piece.type` and dispatches to per-piece functions. Shared helpers: `expandSigns` builds offset tables from the rules.md ± formulas (`ORTHOGONAL` so far), `onBoard`, `addTarget` (applies the capture rule to one cell) and `slideMoves` (for sliding pieces). `getRookMoves(piece)` is implemented; the other eight are stubs that return empty lists.
 - `src/display/drawOrder.ts` defines `ViewName` and a back-to-front ordering for each view. SVG has no z-index, so DOM append order decides which icons are drawn in front.
 - `src/display/cellVisibility.ts` turns a DisplayState snapshot into a classifier that marks each cell `hidden`, `visible` or `highlighted`, using one rule per `CellVisibilityOption`.
-- `src/display/render/` holds shared constants (`PITCH`, `TILT_DEGREES`, axis maxima, the green/red/blue palette for level/rank/file), helpers for creating SVG elements, and the piece icon SVGs.
+- `src/display/render/` holds shared constants (`PITCH`, `TILT_DEGREES`, the green/red/blue palette for level/rank/file), helpers for creating SVG elements, and the piece icon SVGs.
 
 Coordinates: level 1 is the bottom, rank 1 is the front (White's side), and file 1 is on the left as seen from the front. Each is 1-based.
 

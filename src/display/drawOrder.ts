@@ -1,5 +1,4 @@
-import { pieceAt, type ChessPiece } from '../gameState/gameState.ts';
-import { LEVEL_MAX, RANK_MAX, FILE_MAX } from './render/constants.ts';
+import { pieceAt, LEVEL_MAX, RANK_MAX, FILE_MAX, type ChessPiece } from '../gameState/gameState.ts';
 
 // Back-to-front draw orderings for piece icons, one per camera view. SVG has
 // no z-index, so DOM append order decides what appears in front: whatever is

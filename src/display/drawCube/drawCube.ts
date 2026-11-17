@@ -1,8 +1,8 @@
 // @ts-nocheck
 import { PIECE_ICONS } from '../render/pieceIcons.ts';
 import { piecesInDrawOrder } from '../drawOrder.ts';
-import { pieceAt, PIECE_NAMES } from '../../gameState/gameState.ts';
-import { LEVEL_MAX, RANK_MAX, FILE_MAX, PITCH, TILT_DEGREES } from '../render/constants.ts';
+import { pieceAt, PIECE_NAMES, LEVEL_MAX, RANK_MAX, FILE_MAX } from '../../gameState/gameState.ts';
+import { PITCH, TILT_DEGREES } from '../render/constants.ts';
 import { svgEl, parseSvgFragment } from '../render/svg.ts';
 import { buildCellPicker } from '../widgets/cellPicker.ts';
 import { buildDiagToggle } from '../widgets/diagToggle.ts';

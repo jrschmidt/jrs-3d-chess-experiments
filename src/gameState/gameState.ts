@@ -8,10 +8,18 @@ export const PIECE_NAMES: Record<PieceType, string> = {
 };
 export type PieceColor = 'white' | 'black';
 
+// Board size. Coordinates are 1-based:
+//   level 1..LEVEL_MAX  1 = bottom, LEVEL_MAX = top
+//   rank  1..RANK_MAX   1 = front (White's side), RANK_MAX = back
+//   file  1..FILE_MAX   1 = left (as seen from front), FILE_MAX = right
+export const LEVEL_MAX = 5;
+export const RANK_MAX = 8;
+export const FILE_MAX = 5;
+
 export interface Location {
-  level: number; // 1..5
-  rank: number;  // 1..8
-  file: number;  // 1..5
+  level: number; // 1..LEVEL_MAX
+  rank: number;  // 1..RANK_MAX
+  file: number;  // 1..FILE_MAX
 }
 
 export interface ChessPiece {

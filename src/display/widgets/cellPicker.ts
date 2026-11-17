@@ -1,5 +1,6 @@
 // @ts-nocheck
-import { PITCH, LEVEL_MAX, RANK_MAX, FILE_MAX, TILT_DEGREES,
+import { LEVEL_MAX, RANK_MAX, FILE_MAX } from '../../gameState/gameState.ts';
+import { PITCH, TILT_DEGREES,
   LIGHT_GREEN, DARK_GREEN, LIGHT_RED, DARK_RED, LIGHT_BLUE, DARK_BLUE,
   GREEN_RED, GREEN_BLUE, RED_BLUE, CELL_HIGHLIGHT } from '../render/constants.ts';
 import { svgEl } from '../render/svg.ts';
