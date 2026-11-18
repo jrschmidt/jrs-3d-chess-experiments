@@ -4,11 +4,11 @@ import { piecesInDrawOrder } from '../drawOrder.ts';
 import { pieceAt, PIECE_NAMES, LEVEL_MAX, RANK_MAX, FILE_MAX } from '../../gameState/gameState.ts';
 import { PITCH, TILT_DEGREES } from '../render/constants.ts';
 import { svgEl, parseSvgFragment } from '../render/svg.ts';
-import { buildCellPicker } from '../widgets/cellPicker.ts';
+import { buildCellPickerCube } from '../widgets/cellPickerCube.ts';
 import { buildDiagToggle } from '../widgets/diagToggle.ts';
 import { buildViewOption } from '../widgets/viewOption.ts';
 import { buildCellDisplay } from '../widgets/cellDisplay.ts';
-import { DISPLAY_CHANGE, TEXT_STYLE } from '../widgets/widgetChrome.ts';
+import { DISPLAY_CHANGE, TEXT_STYLE, emitDisplayChange } from '../widgets/widgetChrome.ts';
 import {
   getView, getLevel, getRank, getFile, getShow3dDiagonals,
   changeView, setPerspective, setLevel, setRank, setFile, setShow3dDiagonals,
@@ -341,7 +341,7 @@ const refreshDisplay = () => {
   notImplementedEl.setAttribute("display", getView() in groups ? "none" : "inline");
   refreshSliceViews();
   // A view change can reset fields other widgets own, so resync them.
-  cellPickerEl.setValue({ level: getLevel(), rank: getRank(), file: getFile() });
+  cellPickerCubeEl.setValue({ level: getLevel(), rank: getRank(), file: getFile() });
   diagToggleEl.setValue(getShow3dDiagonals());
   refreshCellDisplay();
 };
@@ -602,14 +602,29 @@ const buildSliceView = (config, bbox) => {
   const viewEl = svgEl("g", { id: config.id, display: "none" });
 
   // Each square's checker and diag square (inset as in the cube — see
-  // buildDiagSquares).
+  // buildDiagSquares). Only the checkers take clicks; the diag squares,
+  // frame and pieces drawn over them pass clicks through.
   const checkerGroup = svgEl("g", { id: `${config.prefix}-checkers` });
-  const diagGroup = svgEl("g", { id: `${config.prefix}-diag-squares`, display: getShow3dDiagonals() ? "inline" : "none" });
+  const diagGroup = svgEl("g", {
+    id: `${config.prefix}-diag-squares`, display: getShow3dDiagonals() ? "inline" : "none",
+    "pointer-events": "none",
+  });
   const half = PITCH / 2 - DIAG_SQUARE_MARGIN;
   const squares = [];
   forEachSliceSquare(config, (col, row) => {
     const c = squareCenter(col, row);
-    const checkerEl = svgEl("rect", { x: c.x - PITCH / 2, y: c.y - PITCH / 2, width: PITCH, height: PITCH });
+    const checkerEl = svgEl("rect", {
+      x: c.x - PITCH / 2, y: c.y - PITCH / 2, width: PITCH, height: PITCH,
+      style: "cursor: pointer",
+    });
+    // Clicking a square selects its cell in the plane on screen: one
+    // display-change per field, handled like the cell picker cube's.
+    checkerEl.addEventListener("click", () => {
+      const { level, rank, file } = config.cellAt(col, row, config.plane());
+      emitDisplayChange(checkerEl, "level", level);
+      emitDisplayChange(checkerEl, "rank", rank);
+      emitDisplayChange(checkerEl, "file", file);
+    });
     checkerGroup.appendChild(checkerEl);
     const diagEl = svgEl("rect", {
       x: c.x - half, y: c.y - half, width: half * 2, height: half * 2,
@@ -623,7 +638,7 @@ const buildSliceView = (config, bbox) => {
   diagGroupEls.push(diagGroup);
   viewEl.appendChild(diagGroup);
 
-  const frameGroup = svgEl("g", { id: `${config.prefix}-frame` });
+  const frameGroup = svgEl("g", { id: `${config.prefix}-frame`, "pointer-events": "none" });
   const left = squareCenter(1, 1).x - PITCH / 2;
   const right = squareCenter(config.cols, 1).x + PITCH / 2;
   // The y of the line below row `i + 1` (i = 0 is the bottom edge,
@@ -661,7 +676,7 @@ const buildSliceView = (config, bbox) => {
   }
   viewEl.appendChild(frameGroup);
 
-  const piecesEl = svgEl("g", { id: `${config.prefix}-pieces` });
+  const piecesEl = svgEl("g", { id: `${config.prefix}-pieces`, "pointer-events": "none" });
   viewEl.appendChild(piecesEl);
   sliceViews.push({ config, center, squares, piecesEl });
   return viewEl;
@@ -694,7 +709,7 @@ const buildNotImplemented = (bbox) => {
   return g;
 };
 
-// The cell picker just right of the cube, level with its bottom — so bbox
+// The cell picker cube just right of the cube, level with its bottom — so bbox
 // must already cover the whole cube — then the diagonal toggle at the
 // right, halfway down, with the view selector just to its left.
 const buildControls = (svg, bbox) => {
@@ -703,18 +718,18 @@ const buildControls = (svg, bbox) => {
   const centerY = (bbox.minY + bbox.maxY) / 2;
   const gap = PITCH * 0.2;
 
-  const cellPicker = buildCellPicker(bbox.maxX + gap, bbox.maxY, {
+  const cellPickerCube = buildCellPickerCube(bbox.maxX + gap, bbox.maxY, {
     initial: { level: getLevel(), rank: getRank(), file: getFile() },
     checkerColors: CHECKER_COLORS.focus,
     edgeColor: PERIMETER_COLOR,
     isDarkCell,
   });
-  svg.appendChild(cellPicker.el);
-  mergeBounds(bbox, cellPicker);
-  cellPickerEl = cellPicker;
+  svg.appendChild(cellPickerCube.el);
+  mergeBounds(bbox, cellPickerCube);
+  cellPickerCubeEl = cellPickerCube;
 
-  // Right-aligned with the cell picker, the scene's rightmost point.
-  const diagToggle = buildDiagToggle(cellPicker.maxX, centerY, {
+  // Right-aligned with the cell picker cube, the scene's rightmost point.
+  const diagToggle = buildDiagToggle(cellPickerCube.maxX, centerY, {
     initial: getShow3dDiagonals(),
   });
   svg.appendChild(diagToggle.el);
@@ -734,7 +749,7 @@ const buildControls = (svg, bbox) => {
 let cellDisplayEl = null;
 
 // Populated by buildControls; refreshDisplay resyncs them to displayState.
-let cellPickerEl = null;
+let cellPickerCubeEl = null;
 let diagToggleEl = null;
 
 // Returns the viewBox's top-right corner.

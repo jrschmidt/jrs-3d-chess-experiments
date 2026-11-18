@@ -134,7 +134,7 @@ const faceSquares = () => {
 
 const pointsAttr = (pts) => pts.map((p) => `${p.x.toFixed(2)},${p.y.toFixed(2)}`).join(" ");
 
-export const buildCellPicker = (anchorX, anchorBottomY, { initial, checkerColors, edgeColor, isDarkCell }) => {
+export const buildCellPickerCube = (anchorX, anchorBottomY, { initial, checkerColors, edgeColor, isDarkCell }) => {
   const values = { ...initial };
 
   // Bounds before anchoring: the cube, every numeral box and every label.
@@ -157,13 +157,13 @@ export const buildCellPicker = (anchorX, anchorBottomY, { initial, checkerColors
   const dx = anchorX - local.minX;
   const dy = anchorBottomY - local.maxY;
 
-  const g = svgEl("g", { id: "cell-picker" });
+  const g = svgEl("g", { id: "cell-picker-cube" });
   // Everything is drawn in unanchored coordinates inside this group.
   const inner = svgEl("g", { transform: `translate(${dx.toFixed(2)}, ${dy.toFixed(2)})` });
   g.appendChild(inner);
 
   // Colored by restyle, which knows the selected level, rank and file.
-  const faces = svgEl("g", { id: "cell-picker-faces" });
+  const faces = svgEl("g", { id: "cell-picker-cube-faces" });
   const faceEls = [];
   for (const { corners, cell } of faceSquares()) {
     const el = svgEl("polygon", { points: pointsAttr(corners.map(([r, l, f]) => project(r, l, f))) });
@@ -197,7 +197,7 @@ export const buildCellPicker = (anchorX, anchorBottomY, { initial, checkerColors
 
   const numerals = [];
   for (const { field, values: vs, center } of SELECTORS) {
-    const group = svgEl("g", { id: `cell-picker-${field}` });
+    const group = svgEl("g", { id: `cell-picker-cube-${field}` });
     for (const v of vs) {
       const c = center(v);
       const x0 = c.x - NUM_BOX / 2, y0 = c.y - NUM_BOX / 2;

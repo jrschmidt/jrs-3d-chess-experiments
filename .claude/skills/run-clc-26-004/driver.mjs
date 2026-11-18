@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // Driver for Chess 321 (formerly x3d-chess and clc-26-004, the "5x5x8 Cube"
 // isometric SVG visualization): starts the Vite dev server, drives the app with
-// Playwright/Chromium, takes screenshots, exercises the cell picker, diagonal
+// Playwright/Chromium, takes screenshots, exercises the cell picker cube, diagonal
 // toggle and view-option widgets, and reports console errors.
 //
 // Usage:
@@ -64,16 +64,16 @@ try {
   await page.screenshot({ path: path.join(outDir, "screenshot.png") });
   console.log(`screenshot: ${path.join(outDir, "screenshot.png")}`);
 
-  // The cell picker (see buildCellPicker in src/display/widgets/cellPicker.ts)
+  // The cell picker cube (see buildCellPickerCube in src/display/widgets/cellPickerCube.ts)
   // has one hit target per numeral, the only elements with a `cursor:
-  // pointer` style in its #cell-picker-<field> group, in drawn order: level
+  // pointer` style in its #cell-picker-cube-<field> group, in drawn order: level
   // 5..1, rank 8..1, file 1..5. pick(field, value) clicks one; shownValue
   // reads which numeral is highlighted (shown at full opacity).
   const PICKER_ORDER = { level: [5, 4, 3, 2, 1], rank: [8, 7, 6, 5, 4, 3, 2, 1], file: [1, 2, 3, 4, 5] };
   const pick = (field, value) =>
-    page.locator(`#cell-picker-${field} rect[style*="cursor: pointer"]`).nth(PICKER_ORDER[field].indexOf(value)).click();
+    page.locator(`#cell-picker-cube-${field} rect[style*="cursor: pointer"]`).nth(PICKER_ORDER[field].indexOf(value)).click();
   const shownValue = (field) => page.evaluate((field) =>
-    [...document.querySelectorAll(`#cell-picker-${field} text`)]
+    [...document.querySelectorAll(`#cell-picker-cube-${field} text`)]
       .filter((t) => t.getAttribute("opacity") === "1").map((t) => t.textContent).join(","), field);
 
   // Representative interaction: click the picker's level 2 and confirm the
@@ -83,7 +83,7 @@ try {
   const after = await shownValue("level");
   console.log(`focus level: ${before} -> ${after}`);
   if (before !== "1" || after !== "2") {
-    console.error("FAIL: clicking level 2 in the cell picker did not move the LEVEL highlight from 1 to 2");
+    console.error("FAIL: clicking level 2 in the cell picker cube did not move the LEVEL highlight from 1 to 2");
     exitCode = 1;
   }
 
@@ -98,7 +98,7 @@ try {
     LR: ["#999933"], LF: ["#339999"], RF: ["#993399"], LRF: ["#ff8000"],
   };
   const pickerHighlights = () => page.evaluate((classes) => {
-    const fills = [...document.querySelectorAll("#cell-picker-faces polygon")].map((p) => p.getAttribute("fill"));
+    const fills = [...document.querySelectorAll("#cell-picker-cube-faces polygon")].map((p) => p.getAttribute("fill"));
     return Object.entries(classes)
       .map(([name, colors]) => `${name} ${fills.filter((f) => colors.includes(f)).length}`).join(", ");
   }, HIGHLIGHT_FILLS);
@@ -160,7 +160,7 @@ try {
   // should show only that view's group, keep the selected cell but reset
   // the other displayState fields to the view's initial state
   // (initDisplayStates in src/display/displayState.ts; checked through the
-  // cell picker and diag toggle), and move no widget. Its piece icons must be the same size as
+  // cell picker cube and diag toggle), and move no widget. Its piece icons must be the same size as
   // the cube's, and the diag toggle must show its own overlay in the cube
   // overlay's colors.
   const viewRows = page.locator('#view-option rect[style*="cursor: pointer"]');
@@ -171,7 +171,7 @@ try {
   const showsOnly = (display, id) =>
     Object.entries(display).every(([k, v]) => v === (k === id ? "inline" : "none"));
   const widgetBoxes = () => page.evaluate(() =>
-    ["cell-picker", "diag-toggle", "view-option"].map((id) => {
+    ["cell-picker-cube", "diag-toggle", "view-option"].map((id) => {
       const r = document.getElementById(id).getBoundingClientRect();
       // Position only: sizes can change with content, which isn't a move.
       return `${id}:${r.x.toFixed(1)},${r.y.toFixed(1)}`;
@@ -183,7 +183,7 @@ try {
   }, sel);
   const diagLabel = page.locator('#diag-toggle text[dominant-baseline="central"]');
   // displayState isn't shown on the page, so it's checked through the
-  // widgets that show it (the cell picker's highlights and the diag toggle); `view` and `perspective` in `expected` aren't
+  // widgets that show it (the cell picker cube's highlights and the diag toggle); `view` and `perspective` in `expected` aren't
   // checked here (the view is checked by which group sceneDisplay shows).
   const checkState = async (name, expected) => {
     const shown = {
@@ -253,7 +253,7 @@ try {
   const cellPlacement = await page.evaluate(() => {
     const box = (id) => document.getElementById(id).getBoundingClientRect();
     const c = box("cell-display");
-    const overlaps = ["cell-picker", "diag-toggle", "view-option"]
+    const overlaps = ["cell-picker-cube", "diag-toggle", "view-option"]
       .filter((id) => {
         const w = box(id);
         return w.left < c.right && c.left < w.right && w.top < c.bottom && c.top < w.bottom;
@@ -264,24 +264,24 @@ try {
     };
   });
 
-  // The cell picker sits just right of the cube, below the diag toggle; the
+  // The cell picker cube sits just right of the cube, below the diag toggle; the
   // diag toggle sits at the right, halfway down the page, right-aligned with
   // the picker.
   const diagPlacement = await page.evaluate(() => {
     const box = (id) => document.getElementById(id).getBoundingClientRect();
-    const d = box("diag-toggle"), p = box("cell-picker");
+    const d = box("diag-toggle"), p = box("cell-picker-cube");
     return { centerY: d.y + d.height / 2, pageCenterY: window.innerHeight / 2, right: d.right, bottom: d.bottom,
       pickerRight: p.right, pickerLeft: p.left, pickerTop: p.top, cubeRight: box("cube").right };
   });
-  console.log(`cell picker: left ${diagPlacement.pickerLeft.toFixed(1)} (cube right ${diagPlacement.cubeRight.toFixed(1)}), top ${diagPlacement.pickerTop.toFixed(1)} (diag toggle bottom ${diagPlacement.bottom.toFixed(1)})`);
-  console.log(`diag toggle: center y ${diagPlacement.centerY.toFixed(1)} (page ${diagPlacement.pageCenterY}), right ${diagPlacement.right.toFixed(1)} (cell picker ${diagPlacement.pickerRight.toFixed(1)})`);
+  console.log(`cell picker cube: left ${diagPlacement.pickerLeft.toFixed(1)} (cube right ${diagPlacement.cubeRight.toFixed(1)}), top ${diagPlacement.pickerTop.toFixed(1)} (diag toggle bottom ${diagPlacement.bottom.toFixed(1)})`);
+  console.log(`diag toggle: center y ${diagPlacement.centerY.toFixed(1)} (page ${diagPlacement.pageCenterY}), right ${diagPlacement.right.toFixed(1)} (cell picker cube ${diagPlacement.pickerRight.toFixed(1)})`);
   if (diagPlacement.pickerLeft <= diagPlacement.cubeRight || diagPlacement.pickerTop <= diagPlacement.bottom) {
-    console.error("FAIL: cell picker should be right of the cube and below the diag toggle");
+    console.error("FAIL: cell picker cube should be right of the cube and below the diag toggle");
     exitCode = 1;
   }
   if (Math.abs(diagPlacement.centerY - diagPlacement.pageCenterY) > 5
       || Math.abs(diagPlacement.right - diagPlacement.pickerRight) > 1) {
-    console.error("FAIL: diag toggle should be halfway down the page, right-aligned with the cell picker");
+    console.error("FAIL: diag toggle should be halfway down the page, right-aligned with the cell picker cube");
     exitCode = 1;
   }
 
@@ -304,19 +304,34 @@ try {
   // into Front, and must reset to off. Piece counts are for the carried
   // planes: rank 8, level 2, file 1.
   const CARRIED = { level: 2, rank: 8, file: 1 };
+  // `clickAt` is a grid square (col, row; 1,1 at the bottom left) and the
+  // cell clicking it must select; `carriedAt` is the square of the CARRIED
+  // cell, clicked afterwards to put the selection back.
   const SLICE_CHECKS = [
-    { row: 1, label: "Front View", prefix: "front", cells: 25, pieces: 25, field: "rank",
+    { row: 1, label: "Front View", prefix: "front", cells: 25, pieces: 25, field: "rank", cols: 5,
+      clickAt: { col: 4, row: 3, cell: { level: 3, rank: 8, file: 4 } }, carriedAt: { col: 1, row: 2 },
       expected: { view: "front-white", perspective: "white", ...CARRIED, show3dDiagonals: false } },
-    { row: 2, label: "Top View", prefix: "top", cells: 40, pieces: 20, field: "level",
+    { row: 2, label: "Top View", prefix: "top", cells: 40, pieces: 20, field: "level", cols: 5,
+      clickAt: { col: 2, row: 7, cell: { level: 2, rank: 7, file: 2 } }, carriedAt: { col: 1, row: 8 },
       expected: { view: "top-view", perspective: "all", ...CARRIED, show3dDiagonals: false } },
-    { row: 3, label: "Side View", prefix: "side", cells: 40, pieces: 20, field: "file",
+    { row: 3, label: "Side View", prefix: "side", cells: 40, pieces: 20, field: "file", cols: 8,
+      clickAt: { col: 3, row: 4, cell: { level: 4, rank: 6, file: 1 } }, carriedAt: { col: 1, row: 2 },
       expected: { view: "side-white", perspective: "white", ...CARRIED, show3dDiagonals: false } },
   ];
+  // Clicks the center of a slice view's square with the mouse, so a piece
+  // icon drawn over it must let the click through to the square.
+  const clickSquare = async (prefix, cols, col, row) => {
+    const center = await page.evaluate(({ prefix, i }) => {
+      const r = document.querySelectorAll(`#${prefix}-checkers rect`)[i].getBoundingClientRect();
+      return { x: r.x + r.width / 2, y: r.y + r.height / 2 };
+    }, { prefix, i: (row - 1) * cols + (col - 1) });
+    await page.mouse.click(center.x, center.y);
+  };
 
   const cubeIconSize = await iconSize("#cube > g[transform]");
   let flatIconSize = null;
   const boxesBefore = await widgetBoxes();
-  for (const { row, label, prefix, cells, pieces, field, expected } of SLICE_CHECKS) {
+  for (const { row, label, prefix, cells, pieces, field, cols, clickAt, carriedAt, expected } of SLICE_CHECKS) {
     await viewRows.nth(row).click();
     const display = await sceneDisplay();
     console.log(`${prefix}: display ${JSON.stringify(display)}`);
@@ -416,6 +431,22 @@ try {
     await page.screenshot({ path: path.join(outDir, `screenshot-${prefix}-diag-on.png`) });
     console.log(`screenshot: ${path.join(outDir, `screenshot-${prefix}-diag-on.png`)}`);
     await diagButton.click();
+
+    // Clicking a square selects its cell (all three fields) without moving
+    // the plane shown; clicking the carried cell's square (a piece, so the
+    // click must pass through its icon) puts the selection back.
+    const { level, rank, file } = clickAt.cell;
+    await clickSquare(prefix, cols, clickAt.col, clickAt.row);
+    await checkState(`${prefix} after clicking square ${clickAt.col},${clickAt.row}`, { ...expected, ...clickAt.cell });
+    await checkCell(`${prefix} clicked`, { coords: `${level}, ${rank}, ${file}`, values: `${level},${rank},${file}` });
+    if (!showsOnly(await sceneDisplay(), `${prefix}-view`)) {
+      console.error(`FAIL: clicking a square in ${label} changed the view`);
+      exitCode = 1;
+    }
+    await page.screenshot({ path: path.join(outDir, `screenshot-${prefix}-clicked.png`) });
+    console.log(`screenshot: ${path.join(outDir, `screenshot-${prefix}-clicked.png`)}`);
+    await clickSquare(prefix, cols, carriedAt.col, carriedAt.row);
+    await checkState(`${prefix} after clicking the carried cell`, expected);
   }
 
   await viewRows.nth(0).click();
