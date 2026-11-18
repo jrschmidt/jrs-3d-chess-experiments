@@ -318,6 +318,18 @@ try {
       clickAt: { col: 3, row: 4, cell: { level: 4, rank: 6, file: 1 } }, carriedAt: { col: 1, row: 2 },
       expected: { view: "side-white", perspective: "white", ...CARRIED, show3dDiagonals: false } },
   ];
+  // The view titles currently shown, and where the shown one sits relative
+  // to the top of its view's drawing (the slice grid, or the cube).
+  const shownTitles = () => page.evaluate(() => {
+    const titles = ["cube-title", "front-title", "top-title", "side-title"]
+      .map((id) => document.getElementById(id))
+      .filter((el) => el.getBoundingClientRect().width > 0);
+    const t = titles[0];
+    const grid = t && (t.id === "cube-title" ? document.getElementById("cube")
+      : document.getElementById(t.id.replace("-title", "-checkers")));
+    return { shown: titles.map((el) => el.textContent),
+      bottom: t?.getBoundingClientRect().bottom, gridTop: grid?.getBoundingClientRect().top };
+  });
   // Clicks the center of a slice view's square with the mouse, so a piece
   // icon drawn over it must let the click through to the square.
   const clickSquare = async (prefix, cols, col, row) => {
@@ -447,6 +459,56 @@ try {
     console.log(`screenshot: ${path.join(outDir, `screenshot-${prefix}-clicked.png`)}`);
     await clickSquare(prefix, cols, carriedAt.col, carriedAt.row);
     await checkState(`${prefix} after clicking the carried cell`, expected);
+
+    // The view's title sits above its grid, and is the only title shown.
+    const title = await shownTitles();
+    console.log(`${prefix}: titles shown ${JSON.stringify(title.shown)}; title bottom ${title.bottom?.toFixed(1)}, grid top ${title.gridTop?.toFixed(1)}`);
+    if (JSON.stringify(title.shown) !== JSON.stringify([label]) || !(title.bottom <= title.gridTop)) {
+      console.error(`FAIL: ${label} should show only its title, above its grid`);
+      exitCode = 1;
+    }
+
+    // The plane picker (right of the grid) shows the view's field max..1
+    // and highlights the current one; its up arrow moves the plane one up
+    // (or, at the top, does nothing), and clicking a numeral jumps to it.
+    const pickerSel = `#${prefix}-plane-picker`;
+    const pickerInfo = () => page.evaluate(({ pickerSel, gridSel }) => {
+      const g = document.querySelector(pickerSel);
+      const nums = [...g.querySelectorAll("text")].filter((t) => /^\d$/.test(t.textContent));
+      const lit = [...g.querySelectorAll("rect")].filter((r) => r.getAttribute("rx") && r.getAttribute("display") !== "none");
+      const caption = [...g.querySelectorAll("text")].find((t) => !/^\d$/.test(t.textContent));
+      return {
+        numerals: nums.map((t) => t.textContent).join(""),
+        selected: nums.filter((t) => t.getAttribute("opacity") === "1").map((t) => t.textContent).join(""),
+        highlights: lit.length,
+        caption: caption.textContent, captionRotate: caption.getAttribute("transform").startsWith("rotate(90 "),
+        rightOfGrid: g.getBoundingClientRect().left > document.querySelector(gridSel).getBoundingClientRect().right,
+      };
+    }, { pickerSel, gridSel: `#${prefix}-checkers` });
+    const max = PICKER_ORDER[field].length;
+    const wantNumerals = Array.from({ length: max }, (_, i) => String(max - i)).join("");
+    const info = await pickerInfo();
+    console.log(`${prefix} plane picker: ${JSON.stringify(info)}`);
+    if (info.numerals !== wantNumerals || info.selected !== String(start) || info.highlights !== 1
+        || info.caption !== field.toUpperCase() || !info.captionRotate || !info.rightOfGrid) {
+      console.error(`FAIL: ${label} plane picker should show ${wantNumerals} with ${start} highlighted and a rotated ${field.toUpperCase()} caption, right of the grid`);
+      exitCode = 1;
+    }
+    const upTo = Math.min(start + 1, max);
+    await page.locator(`${pickerSel} [data-arrow="up"]`).click();
+    await checkState(`${prefix} after plane picker up`, { ...expected, [field]: upTo });
+    await page.locator(`${pickerSel} [data-arrow="down"]`).click();
+    await checkState(`${prefix} after plane picker down`, { ...expected, [field]: upTo - 1 });
+    await page.locator(`${pickerSel} [data-value="1"]`).click();
+    await checkState(`${prefix} after plane picker numeral 1`, { ...expected, [field]: 1 });
+    if ((await pickerInfo()).selected !== "1") {
+      console.error(`FAIL: ${label} plane picker should highlight 1 after clicking it`);
+      exitCode = 1;
+    }
+    await page.screenshot({ path: path.join(outDir, `screenshot-${prefix}-plane-1.png`) });
+    console.log(`screenshot: ${path.join(outDir, `screenshot-${prefix}-plane-1.png`)}`);
+    await page.locator(`${pickerSel} [data-value="${start}"]`).click();
+    await checkState(`${prefix} after plane picker back to ${start}`, expected);
   }
 
   await viewRows.nth(0).click();
@@ -457,6 +519,12 @@ try {
     exitCode = 1;
   }
   await checkState("cube after switching", { ...CUBE_INIT, ...CARRIED });
+  const cubeTitle = await shownTitles();
+  console.log(`cube: titles shown ${JSON.stringify(cubeTitle.shown)}; title bottom ${cubeTitle.bottom?.toFixed(1)}, cube top ${cubeTitle.gridTop?.toFixed(1)}`);
+  if (JSON.stringify(cubeTitle.shown) !== JSON.stringify(["Cube View"]) || !(cubeTitle.bottom <= cubeTitle.gridTop)) {
+    console.error("FAIL: Cube View should show only its title, above the cube");
+    exitCode = 1;
+  }
   const diagDisplayCube = await page.locator("#diag-squares").getAttribute("display");
   if (diagDisplayCube !== "none") {
     console.error("FAIL: diag overlay should be hidden after switching to cube-view");

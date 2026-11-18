@@ -8,6 +8,7 @@ import { buildCellPickerCube } from '../widgets/cellPickerCube.ts';
 import { buildDiagToggle } from '../widgets/diagToggle.ts';
 import { buildViewOption } from '../widgets/viewOption.ts';
 import { buildCellDisplay } from '../widgets/cellDisplay.ts';
+import { buildPlanePicker } from '../widgets/planePicker.ts';
 import { DISPLAY_CHANGE, TEXT_STYLE, emitDisplayChange } from '../widgets/widgetChrome.ts';
 import {
   getView, getLevel, getRank, getFile, getShow3dDiagonals,
@@ -311,6 +312,9 @@ let diagGroupEls = [];
 let cubeGroupEl = null;
 let sliceViewEls = {};
 let notImplementedEl = null;
+// The cube's title, outside cubeGroupEl (see buildScene), so shown and
+// hidden separately.
+let cubeTitleEl = null;
 
 // The group drawing each implemented view; views not listed (front-black,
 // side-black) show the placeholder.
@@ -339,6 +343,7 @@ const refreshDisplay = () => {
     el.setAttribute("display", view === getView() ? "inline" : "none");
   }
   notImplementedEl.setAttribute("display", getView() in groups ? "none" : "inline");
+  cubeTitleEl.setAttribute("display", getView() === "cube-view" ? "inline" : "none");
   refreshSliceViews();
   // A view change can reset fields other widgets own, so resync them.
   cellPickerCubeEl.setValue({ level: getLevel(), rank: getRank(), file: getFile() });
@@ -527,11 +532,14 @@ const buildFrame = (bbox) => {
 // displayState (falling back to the plane its view starts on when that
 // field is null), and maps a grid square (col, row) of that plane to its
 // cell; `rowsAreLevels` says whether the rows are levels (front, side) or
-// ranks (top), which decides how the frame shows the focus level.
+// ranks (top), which decides how the frame shows the focus level. `title`
+// is drawn above the grid; `planeField` (with its caption and maximum) is
+// the field the view's plane picker changes.
 const SLICE_VIEWS = {
   // The focus rank, seen from in front of it (white's side).
   "front-white": {
     id: "front-view", prefix: "front", cols: FILE_MAX, rows: LEVEL_MAX, rowsAreLevels: true,
+    title: "Front View", planeField: "rank", planeLabel: "RANK", planeMax: RANK_MAX,
     plane: () => getRank() ?? 1,
     cellAt: (col, row, rank) => ({ rank, level: row, file: col }),
   },
@@ -539,6 +547,7 @@ const SLICE_VIEWS = {
   // and rank 1 at the right, as on the cube's visible file-1 face.
   "side-white": {
     id: "side-view", prefix: "side", cols: RANK_MAX, rows: LEVEL_MAX, rowsAreLevels: true,
+    title: "Side View", planeField: "file", planeLabel: "FILE", planeMax: FILE_MAX,
     plane: () => getFile() ?? 1,
     cellAt: (col, row, file) => ({ rank: RANK_MAX + 1 - col, level: row, file }),
   },
@@ -546,6 +555,7 @@ const SLICE_VIEWS = {
   // at the left.
   "top-view": {
     id: "top-view", prefix: "top", cols: FILE_MAX, rows: RANK_MAX, rowsAreLevels: false,
+    title: "Top View", planeField: "level", planeLabel: "LEVEL", planeMax: LEVEL_MAX,
     plane: () => getLevel() ?? LEVEL_MAX,
     cellAt: (col, row, level) => ({ rank: row, level, file: col }),
   },
@@ -575,8 +585,9 @@ const forEachSliceSquare = (config, fn) => {
 // it currently shows. All three are kept current, so a hidden view is
 // already right when it's shown.
 const refreshSliceViews = () => {
-  for (const { config, center, squares, piecesEl } of sliceViews) {
+  for (const { config, center, squares, piecesEl, planePicker } of sliceViews) {
     const plane = config.plane();
+    planePicker.setValue(plane);
     piecesEl.replaceChildren();
     for (const { col, row, checkerEl, diagEl } of squares) {
       const cell = config.cellAt(col, row, plane);
@@ -588,6 +599,19 @@ const refreshSliceViews = () => {
       if (piece) renderPieceIcon(piece.type, piece.color, sliceSquareCenter(config, center, col, row), piecesEl);
     }
   }
+};
+
+// A view's title ("Cube View", "Front View", ...), centered on x with its
+// baseline a little above topY (the top of the view's drawing).
+const buildViewTitle = (text, x, topY, id) => {
+  const el = svgEl("text", {
+    id, x, y: topY - PITCH * 0.2,
+    "text-anchor": "middle",
+    "font-size": PITCH * 0.4,
+    ...TEXT_STYLE,
+  });
+  el.textContent = text;
+  return el;
 };
 
 // Built centered on the cube's bbox (pass it before the widgets are merged
@@ -678,7 +702,18 @@ const buildSliceView = (config, bbox) => {
 
   const piecesEl = svgEl("g", { id: `${config.prefix}-pieces`, "pointer-events": "none" });
   viewEl.appendChild(piecesEl);
-  sliceViews.push({ config, center, squares, piecesEl });
+
+  viewEl.appendChild(buildViewTitle(config.title, center.x, rowBoundaryY(config.rows), `${config.prefix}-title`));
+
+  // The plane picker, a gap right of the grid, centered on it.
+  const planePicker = buildPlanePicker(right + PITCH * 0.3, center.y, {
+    id: `${config.prefix}-plane-picker`,
+    field: config.planeField, label: config.planeLabel, max: config.planeMax,
+    initial: config.plane(),
+  });
+  viewEl.appendChild(planePicker.el);
+
+  sliceViews.push({ config, center, squares, piecesEl, planePicker });
   return viewEl;
 };
 
@@ -789,6 +824,7 @@ const shrinkCubeToClear = (cubeBbox, clearX) => {
   const k = Math.min(1, (clearX - px) / (cubeBbox.maxX - px));
   cubeGroupEl.setAttribute("transform",
     `translate(${px.toFixed(2)}, ${py.toFixed(2)}) scale(${k.toFixed(4)}) translate(${(-px).toFixed(2)}, ${(-py).toFixed(2)})`);
+  return k;
 };
 
 export const buildScene = () => {
@@ -824,7 +860,14 @@ export const buildScene = () => {
 
   cellDisplayEl = buildCellDisplay(vbCorner.x - CELL_DISPLAY_MARGIN, vbCorner.y + CELL_DISPLAY_MARGIN);
   svg.appendChild(cellDisplayEl.el);
-  shrinkCubeToClear(cubeBbox, cellDisplayEl.minX - PITCH * 0.3);
+  const k = shrinkCubeToClear(cubeBbox, cellDisplayEl.minX - PITCH * 0.3);
+
+  // Outside cubeGroupEl, so it doesn't shrink with the cube, but placed
+  // over the shrunken cube (scaled about its bottom-left corner). It sits
+  // in the viewBox's top padding (see fitViewBox).
+  const { minX, maxX, minY, maxY } = cubeBbox;
+  cubeTitleEl = buildViewTitle("Cube View", minX + k * ((minX + maxX) / 2 - minX), maxY - k * (maxY - minY), "cube-title");
+  svg.appendChild(cubeTitleEl);
 
   positionCellDisplay(svg);
   window.addEventListener("resize", () => positionCellDisplay(svg));
