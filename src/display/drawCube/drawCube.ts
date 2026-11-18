@@ -2,8 +2,17 @@
 import { PIECE_ICONS } from '../render/pieceIcons.ts';
 import { piecesInDrawOrder } from '../drawOrder.ts';
 import { pieceAt, PIECE_NAMES, LEVEL_MAX, RANK_MAX, FILE_MAX } from '../../gameState/gameState.ts';
-import { PITCH, TILT_DEGREES } from '../render/constants.ts';
+import { PITCH } from '../render/constants.ts';
 import { svgEl, parseSvgFragment } from '../render/svg.ts';
+import {
+  HALF, V_LEVEL, add, scale, projectCenter, pointsAttr,
+  floorPerimeter, ceilingPerimeter, boundaryCorners, chevronPoints, verticalEdges,
+  cellFootprint, cellFootprintInset,
+} from '../render/isoProjection.ts';
+import {
+  PERIMETER_COLOR, PERIMETER_HIGHLIGHT, CHECKER_COLORS, checkerColor,
+  isDarkCell, DIAG_COLORS, diagForCell,
+} from '../render/cellColors.ts';
 import { buildCellPickerCube } from '../widgets/cellPickerCube.ts';
 import { buildDiagToggle } from '../widgets/diagToggle.ts';
 import { buildViewOption } from '../widgets/viewOption.ts';
@@ -15,205 +24,8 @@ import {
   changeView, setPerspective, setLevel, setRank, setFile, setShow3dDiagonals,
 } from '../displayState.ts';
 
-
-// Cell coordinates (rank, level, file) are defined in render/constants.ts.
-// Shorthand (l, r, f) = (level, rank, file) is used below wherever a cell's
-// diagonal-set membership is computed.
-
-// A "floor" is a thin outline tracing the full rank x file perimeter of each
-// level — a subtle visual aid for telling the five levels of the cube apart.
-// (A filled full-footprint plane was tried first, but adjacent levels' planes
-// overlapped almost completely on screen since the rank/file extent is much
-// wider than one level's vertical spacing.)
-const PERIMETER_COLOR = "#505050";
-const PERIMETER_HIGHLIGHT = "#999999";
-
-// Flat checkerboard colors, chosen by whether the square's level is the
-// focus level. Only the visible portion of each level's floor (see
-// chevronPoints below) is ever drawn; the hidden portion renders nothing.
-const CHECKER_COLORS = {
-  focus: { light: "#a0a0a0", dark: "#1f1f1f" },
-  unfocused: { light: "#808080", dark: "#333333" },
-};
-
-// Display state (focus level, diagonal overlay, view, ...) lives in
-// displayState.ts. The "focus level" (getLevel) is the level the viewer is
-// currently paying attention to; its checkerboard is shown brightest, with
-// every other level faint.
-
-const checkerColor = (level, variant, focus) =>
-  CHECKER_COLORS[level === focus ? "focus" : "unfocused"][variant];
-
-// Diagonal color lookup table — the only place a diagonal label (diag_a
-// .. diag_d) is tied to an actual color. Change a value here to recolor
-// every cell in that diagonal set; nothing else needs to change.
-//
-// The four values are matched for perceived brightness (OKLab lightness
-// L ~ 0.53-0.55, perceived-luminance ~74-92 on a 0-255 scale) rather than
-// for equal hex saturation — human vision reads green as much brighter
-// than blue at the same saturation, so matching hex patterns (as the
-// original #3333cc/#cc33cc/#cc6633/#33cc33 did) left green looking like
-// it "popped" out of the set. To adjust brightness later, shift all four
-// L values by the same amount rather than editing one hex in isolation,
-// or the imbalance comes back.
-const DIAG_BLUE = "#1953ff";
-const DIAG_PURPLE = "#b300b3";
-const DIAG_ORANGE = "#b34100";
-const DIAG_GREEN = "#178217";
-
-const DIAG_COLORS = {
-  diag_a: DIAG_BLUE,
-  diag_b: DIAG_PURPLE,
-  diag_c: DIAG_ORANGE,
-  diag_d: DIAG_GREEN,
-};
-
-const CELL_FRACTION = 1;    // fraction of PITCH each cell's floor occupies (1 = cells abut, no gap)
-const HALF = CELL_FRACTION / 2;
-const ICON_HALF = HALF / 2;    // half-cell scale (half width/height of the cell footprint) used for icons
-
 const DIAG_SQUARE_MARGIN = 3;      // px gap between a diag square and the cell's outer edge
 const DIAG_SQUARE_STROKE_WIDTH = 3; // px width of the diag square's outline
-
-const TILT_RAD = TILT_DEGREES * Math.PI / 180;
-const COS_TILT = Math.cos(TILT_RAD);
-const SIN_TILT = Math.sin(TILT_RAD);
-
-// Per-unit-step screen-space basis vectors, derived from the isometric projection
-// (file - rank) * cos(tilt), -(rank + file) * sin(tilt) - level. This puts
-// the rank=max/file=max corner (back-right) at the top of the view and the
-// rank=max/file=1 corner (back-left) at the left — i.e. the viewer faces the
-// right-front face of the cube, with the left-rear face away from them.
-const V_FILE = { x: COS_TILT * PITCH, y: -SIN_TILT * PITCH };
-const V_RANK = { x: -COS_TILT * PITCH, y: -SIN_TILT * PITCH };
-const V_LEVEL = { x: 0, y: -PITCH };
-
-const add = (...vecs) => {
-  return vecs.reduce((a, v) => ({ x: a.x + v.x, y: a.y + v.y }), { x: 0, y: 0 });
-};
-const scale = (v, s) => {
-  return { x: v.x * s, y: v.y * s };
-};
-
-const projectCenter = (rank, level, file) => {
-  return {
-    x: (file - rank) * COS_TILT * PITCH,
-    y: -(rank + file) * SIN_TILT * PITCH - level * PITCH,
-  };
-};
-
-const pointsAttr = (corners) => {
-  return corners.map((c) => `${c.x.toFixed(2)},${c.y.toFixed(2)}`).join(" ");
-};
-
-// The four outer vertical corners of a level, at its floor (dropSign -1) or
-// ceiling (dropSign +1) plane. rank=max/file=max (backRight) is the corner
-// farthest from the viewer, at the rear of the cube — see the basis-vector
-// comment above.
-const perimeterCorners = (level, dropSign) => {
-  const drop = scale(V_LEVEL, dropSign * HALF);
-  const rMin = scale(V_RANK, -HALF);
-  const rMax = scale(V_RANK, HALF);
-  const fMin = scale(V_FILE, -HALF);
-  const fMax = scale(V_FILE, HALF);
-
-  const frontLeft = add(projectCenter(1, level, 1), rMin, fMin, drop);
-  const frontRight = add(projectCenter(1, level, FILE_MAX), rMin, fMax, drop);
-  const backRight = add(projectCenter(RANK_MAX, level, FILE_MAX), rMax, fMax, drop);
-  const backLeft = add(projectCenter(RANK_MAX, level, 1), rMax, fMin, drop);
-  return { frontLeft, frontRight, backRight, backLeft };
-};
-
-const floorPerimeter = (level) => {
-  const { frontLeft, frontRight, backRight, backLeft } = perimeterCorners(level, -1);
-  return [frontLeft, frontRight, backRight, backLeft];
-};
-
-// The level-LEVEL_MAX ceiling perimeter — the top face of the cube.
-const ceilingPerimeter = () => {
-  const { frontLeft, frontRight, backRight, backLeft } = perimeterCorners(LEVEL_MAX, 1);
-  return [frontLeft, frontRight, backRight, backLeft];
-};
-
-// The 4 named corners of horizontal boundary `i`, where boundaries are
-// indexed 0..LEVEL_MAX from the floor of level 1 to the ceiling of
-// LEVEL_MAX. boundaryCorners(level - 1) is floorPerimeter(level)'s corners;
-// boundaryCorners(LEVEL_MAX) is ceilingPerimeter()'s corners.
-const boundaryCorners = (i) =>
-  i < LEVEL_MAX ? perimeterCorners(i + 1, -1) : perimeterCorners(LEVEL_MAX, 1);
-
-// The visible portion of level L's floor (L = 1..LEVEL_MAX-1; the top level
-// is always fully visible), as a 6-vertex chevron in screen space. Named
-// per the vertical edges A (back-right), B (front-right), C (front-left),
-// D (back-left): [D_L, C_L, B_L, B_(L-1), C_(L-1), D_(L-1)], where the
-// subscript indexes boundaryCorners (0 = floor of level 1, LEVEL_MAX =
-// ceiling of level LEVEL_MAX).
-const chevronPoints = (level) => {
-  const upper = boundaryCorners(level);
-  const lower = boundaryCorners(level - 1);
-  return [
-    upper.backLeft, upper.frontLeft, upper.frontRight,
-    lower.frontRight, lower.frontLeft, lower.backLeft,
-  ];
-};
-
-// Vertical edges at 3 of the 4 outer corners, spanning the cube's full
-// height (floor of level 1 to ceiling of LEVEL_MAX). The 4th corner,
-// backRight, is where the two always-hidden faces (back, right) meet — see
-// chevronPoints — so it's omitted entirely rather than drawn hidden.
-const verticalEdges = () => {
-  const bottom = perimeterCorners(1, -1);
-  const top = perimeterCorners(LEVEL_MAX, 1);
-  return [
-    [bottom.frontLeft, top.frontLeft],
-    [bottom.frontRight, top.frontRight],
-    [bottom.backLeft, top.backLeft],
-  ];
-};
-
-// The floor-plane footprint of a single cell, half-extent `half` (in units
-// of PITCH) out from center along the rank and file axes. Corner order is
-// front-left, front-right, back-right, back-left (matching floorPerimeter).
-const cellFootprintAt = (rank, level, file, half) => {
-  const drop = scale(V_LEVEL, -HALF);
-  const rMin = scale(V_RANK, -half);
-  const rMax = scale(V_RANK, half);
-  const fMin = scale(V_FILE, -half);
-  const fMax = scale(V_FILE, half);
-  const center = projectCenter(rank, level, file);
-
-  return [
-    add(center, rMin, fMin, drop),
-    add(center, rMin, fMax, drop),
-    add(center, rMax, fMax, drop),
-    add(center, rMax, fMin, drop),
-  ];
-};
-
-// The footprint of a single cell's whole floor.
-const cellFootprint = (rank, level, file) => cellFootprintAt(rank, level, file, HALF);
-
-// The footprint of a cell's diag square, inset `marginPx` from the cell's
-// outer edge. V_RANK and V_FILE both have magnitude PITCH, so a screen-space
-// inset of marginPx along either axis is marginPx / PITCH of HALF.
-const cellFootprintInset = (rank, level, file, marginPx) =>
-  cellFootprintAt(rank, level, file, HALF - marginPx / PITCH);
-
-// Corners of a rhombus with half-extent `half` along the rank/file axes,
-// centered at the origin (unpositioned) — the building block for icon
-// shapes that renderPieceIcon then translates onto a specific cell.
-const rhombusCorners = (half) => {
-  const rMin = scale(V_RANK, -half);
-  const rMax = scale(V_RANK, half);
-  const fMin = scale(V_FILE, -half);
-  const fMax = scale(V_FILE, half);
-  return [
-    add(rMin, fMin),
-    add(rMin, fMax),
-    add(rMax, fMax),
-    add(rMax, fMin),
-  ];
-};
 
 // Draws the icon for a (type, color) piece (e.g. "K"/"black" -> PIECE_ICONS
 // key "kb") centered on `center`, inside `parent`.
@@ -239,31 +51,6 @@ export const renderPieceIcons = () => {
   refreshSliceViews();
   refreshCellDisplay();
 };
-
-// Checkerboard parity: a cell is "dark" when rank + level + file is odd.
-const isDarkCell = (rank, level, file) => (rank + level + file) % 2 === 1;
-
-// Diagonal membership: every cell (l, r, f) = (level, rank, file) belongs to
-// exactly one of four mutually exclusive sets of 3D-diagonally-adjacent
-// cells, determined by comparing the parity of rank and file against level:
-//
-//   is_odd(R) == is_odd(L)  &&  is_odd(F) == is_odd(L)  ->  diag_a
-//   is_odd(R) == is_odd(L)  &&  is_odd(F) != is_odd(L)  ->  diag_b
-//   is_odd(R) != is_odd(L)  &&  is_odd(F) == is_odd(L)  ->  diag_c
-//   is_odd(R) != is_odd(L)  &&  is_odd(F) != is_odd(L)  ->  diag_d
-const isOdd = (n) => (n % 2) === 1;
-
-const diagForCell = (rank, level, file) => {
-  const rMatchesL = isOdd(rank) === isOdd(level);
-  const fMatchesL = isOdd(file) === isOdd(level);
-  if (rMatchesL && fMatchesL) return "diag_a";
-  if (rMatchesL && !fMatchesL) return "diag_b";
-  if (!rMatchesL && fMatchesL) return "diag_c";
-  return "diag_d";
-};
-
-// Placeholder visibility rule — subject to change.
-const isVisibleCell = (l, r, f) => l === 5 || r === 1 || f === 1;
 
 // --- Bounding-box helpers ---
 const extendBounds = (b, points) => {
