@@ -1,4 +1,7 @@
-# **Chess 321** 3-D Chess
+*3-D Chess*
+# **Chess 321**
+
+
 # Piece Moves and Game Rules
 
 ## The Game Board
