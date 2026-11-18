@@ -15,7 +15,7 @@ export function getLegalMoves(piece: ChessPiece): LegalMovesList {
     case 'Q':
       return getQueenMoves(piece);
     case 'E':
-      return getEagleMoves();
+      return getEagleMoves(piece);
     case 'R':
       return getRookMoves(piece);
     case 'B':
@@ -95,6 +95,19 @@ function slideMoves(piece: ChessPiece, offsets: readonly Offset[]): LegalMovesLi
   return result;
 }
 
+// Tries each offset once (n = 1 only). Used for the one-step pieces (king,
+// eagle) and the leapers (knight, zebra): nothing in between blocks the move.
+function stepMoves(piece: ChessPiece, offsets: readonly Offset[]): LegalMovesList {
+  const result: LegalMovesList = { emptyCells: [], captures: [] };
+  const from = piece.location;
+  if (!from) return result;
+  for (const [dl, dr, df] of offsets) {
+    const target = { level: from.level + dl, rank: from.rank + dr, file: from.file + df };
+    if (onBoard(target)) addTarget(result, piece, target);
+  }
+  return result;
+}
+
 // ---- Per-piece move functions ----
 
 function getKingMoves(): LegalMovesList {
@@ -105,8 +118,8 @@ function getQueenMoves(piece: ChessPiece): LegalMovesList {
   return slideMoves(piece, ALL_DIRECTIONS);
 }
 
-function getEagleMoves(): LegalMovesList {
-  return { emptyCells: [], captures: [] };
+function getEagleMoves(piece: ChessPiece): LegalMovesList {
+  return stepMoves(piece, ALL_DIRECTIONS);
 }
 
 function getRookMoves(piece: ChessPiece): LegalMovesList {
