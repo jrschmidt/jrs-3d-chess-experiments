@@ -215,6 +215,7 @@ const initPostions = (): void => {
 
 
 export const initGameState = (): void => {
+  resetGameState();
   // buildExample1();
   initPostions();
 };

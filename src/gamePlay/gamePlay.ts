@@ -43,7 +43,7 @@ function getCandidateMoves(piece: ChessPiece): LegalMovesList {
     case 'Z':
       return getZebraMoves(piece);
     case 'P':
-      return getPawnMoves();
+      return getPawnMoves(piece);
   }
 }
 
@@ -83,6 +83,13 @@ const KNIGHT = expandSigns([[2, 1, 0], [1, 2, 0], [2, 0, 1], [0, 2, 1], [1, 0, 2
 
 // Zebra: (±2, ±1, ±1) (±1, ±2, ±1) (±1, ±1, ±2) → 24 jumps
 const ZEBRA = expandSigns([[2, 1, 1], [1, 2, 1], [1, 1, 2]]);
+
+// Pawn capture: (±0, +1, ±1) (±1, +1, ±0), as (level, file) changes;
+// the rank change is the pawn's forward direction.
+const PAWN_CAPTURES: readonly (readonly [number, number])[] = [[0, 1], [0, -1], [1, 0], [-1, 0]];
+
+const pawnForward = (c: PieceColor): number => (c === 'white' ? 1 : -1);
+const PAWN_START_RANK: Record<PieceColor, number> = { white: 2, black: RANK_MAX - 1 };
 
 function onBoard({ level, rank, file }: Location): boolean {
   return level >= 1 && level <= LEVEL_MAX
@@ -174,8 +181,8 @@ function isAttacked(cell: Location, byColor: PieceColor, at: Occupancy = pieceAt
   }
   // A pawn captures one rank forward plus one step in file or level, so it
   // attacks from one rank behind the cell (from its own side's point of view).
-  const behind = byColor === 'white' ? -1 : 1;
-  for (const [dl, df] of [[0, 1], [0, -1], [1, 0], [-1, 0]]) {
+  const behind = -pawnForward(byColor);
+  for (const [dl, df] of PAWN_CAPTURES) {
     const loc = { level: cell.level + dl, rank: cell.rank + behind, file: cell.file + df };
     const p = onBoard(loc) ? at(loc) : undefined;
     if (p && p.color === byColor && p.type === 'P') return true;
@@ -228,6 +235,26 @@ function getZebraMoves(piece: ChessPiece): LegalMovesList {
   return stepMoves(piece, ZEBRA);
 }
 
-function getPawnMoves(): LegalMovesList {
-  return { emptyCells: [], captures: [] };
+// En passant and promotion are not handled yet (they need move execution).
+function getPawnMoves(piece: ChessPiece): LegalMovesList {
+  const result: LegalMovesList = { emptyCells: [], captures: [] };
+  const from = piece.location;
+  if (!from) return result;
+  const dr = pawnForward(piece.color);
+
+  // Move, and double move from the start rank; both need empty cells.
+  const one = { level: from.level, rank: from.rank + dr, file: from.file };
+  if (onBoard(one) && !pieceAt(one)) {
+    result.emptyCells.push(one);
+    const two = { level: from.level, rank: from.rank + 2 * dr, file: from.file };
+    if (from.rank === PAWN_START_RANK[piece.color] && !pieceAt(two)) result.emptyCells.push(two);
+  }
+
+  // Capture: forward plus one step in file or level, enemy pieces only.
+  for (const [dl, df] of PAWN_CAPTURES) {
+    const target = { level: from.level + dl, rank: from.rank + dr, file: from.file + df };
+    const occupant = onBoard(target) ? pieceAt(target) : undefined;
+    if (occupant && occupant.color !== piece.color) result.captures.push(occupant);
+  }
+  return result;
 }
