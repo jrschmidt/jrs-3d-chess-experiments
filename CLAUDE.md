@@ -6,7 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 Chess 321 is a 3-D chess variant played on a 5x5x8 board (5 levels × 8 ranks × 5 files), drawn as an isometric SVG scene in the browser. The game rules (board geometry, cell coloring, diagonal types, piece moves) are in `docs/rules.md`. Besides the traditional pieces, the game adds three new ones: Eagle (`E`), Triton (`T`) and Zebra (`Z`).
 
-Right now the app is only a visualization: it draws the board and pieces, with widgets for choosing the view and focus cell. Move logic hasn't been written yet.
+Right now the app is only a visualization: it draws the board and pieces, with widgets for choosing the view and focus cell. Move computation is in progress in `src/gamePlay/` and isn't wired into the UI yet.
 
 ## Commands
 
@@ -37,7 +37,7 @@ Widgets and the scene talk through events:
 
 Other modules:
 
-- `src/gamePlay/gamePlay.ts` holds move computation. So far it defines `LegalMovesList` (`emptyCells: Location[]`, `captures: ChessPiece[]`) and `getLegalMoves(piece)`, which switches on `piece.type` and dispatches to per-piece functions. Shared helpers: `expandSigns` builds offset tables from the rules.md ± formulas (`ORTHOGONAL`, `DIAGONAL_2D`, `DIAGONAL_3D`, `ALL_DIRECTIONS` combining all 26, `KNIGHT`, `ZEBRA`), `onBoard`, `addTarget` (applies the capture rule to one cell), `slideMoves` (for sliding pieces) and `stepMoves` (one try per offset, for one-step and leaping pieces). The sliding pieces (rook, bishop, triton, queen) and the step/leap pieces eagle, knight and zebra are implemented; king and pawn are stubs that return empty lists.
+- `src/gamePlay/gamePlay.ts` holds move computation. It defines `LegalMovesList` (`emptyCells: Location[]`, `captures: ChessPiece[]`). The private `getCandidateMoves(piece)` switches on `piece.type` and dispatches to per-piece functions (moves by movement rules alone). The exported `getLegalMoves(piece)` filters those through `leavesKingInCheck`, which checks the board as it would be after the move (`afterMove`, without changing game state) with `isAttacked`. That covers moving into check, pins and answering a check. `isAttacked` looks outward from a cell using the `ATTACKERS` table plus the pawn capture rule, and `isInCheck(color)` is exported. Shared helpers: `expandSigns` builds offset tables from the rules.md ± formulas (`ORTHOGONAL`, `DIAGONAL_2D`, `DIAGONAL_3D`, `ALL_DIRECTIONS` combining all 26, `KNIGHT`, `ZEBRA`), `onBoard`, `addTarget` (applies the capture rule to one cell), `slideMoves` (for sliding pieces) and `stepMoves` (one try per offset, for one-step and leaping pieces). All pieces but the pawn are implemented; the pawn is a stub. Castling, checkmate and stalemate are not done yet.
 - `src/display/drawOrder.ts` defines `ViewName` and a back-to-front ordering for each view. SVG has no z-index, so DOM append order decides which icons are drawn in front.
 - `src/display/cellVisibility.ts` turns a DisplayState snapshot into a classifier that marks each cell `hidden`, `visible` or `highlighted`, using one rule per `CellVisibilityOption`.
 - `src/display/render/` holds shared constants (`PITCH`, `TILT_DEGREES`, the green/red/blue palette for level/rank/file), helpers for creating SVG elements, and the piece icon SVGs.

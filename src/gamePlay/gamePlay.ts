@@ -1,6 +1,6 @@
 import {
-  pieceAt, LEVEL_MAX, RANK_MAX, FILE_MAX,
-  type ChessPiece, type Location,
+  pieceAt, getBoardPositions, LEVEL_MAX, RANK_MAX, FILE_MAX,
+  type ChessPiece, type Location, type PieceType, type PieceColor,
 } from '../gameState/gameState.ts';
 
 export type LegalMovesList = {
@@ -8,10 +8,26 @@ export type LegalMovesList = {
   captures: ChessPiece[];
 };
 
+// Legal moves: the piece's candidate moves, minus any that would leave its
+// own king attacked (moving into check, ignoring a check, or breaking a pin).
 export function getLegalMoves(piece: ChessPiece): LegalMovesList {
+  const moves = getCandidateMoves(piece);
+  return {
+    emptyCells: moves.emptyCells.filter((cell) => !leavesKingInCheck(piece, cell)),
+    captures: moves.captures.filter((target) => !leavesKingInCheck(piece, target.location!)),
+  };
+}
+
+export function isInCheck(color: PieceColor): boolean {
+  const king = kingLocation(color);
+  return king !== null && isAttacked(king, opponent(color));
+}
+
+// Moves by the piece's movement rules alone, ignoring check.
+function getCandidateMoves(piece: ChessPiece): LegalMovesList {
   switch (piece.type) {
     case 'K':
-      return getKingMoves();
+      return getKingMoves(piece);
     case 'Q':
       return getQueenMoves(piece);
     case 'E':
@@ -114,10 +130,74 @@ function stepMoves(piece: ChessPiece, offsets: readonly Offset[]): LegalMovesLis
   return result;
 }
 
+// ---- Check ----
+
+type Occupancy = (cell: Location) => ChessPiece | undefined;
+
+const sameCell = (a: Location, b: Location): boolean =>
+  a.level === b.level && a.rank === b.rank && a.file === b.file;
+
+const opponent = (c: PieceColor): PieceColor => (c === 'white' ? 'black' : 'white');
+
+// The board as it would be after `piece` moves to `to`, without changing game
+// state. Whatever stood on `to` is captured, and the cell it left is empty.
+function afterMove(piece: ChessPiece, to: Location): Occupancy {
+  const from = piece.location!;
+  return (cell) => (sameCell(cell, to) ? piece : sameCell(cell, from) ? undefined : pieceAt(cell));
+}
+
+// Which enemy pieces attack along which offsets. isAttacked looks outward from
+// the cell, so it never generates enemy moves (no recursion).
+const ATTACKERS: { offsets: readonly Offset[]; slide: boolean; types: PieceType[] }[] = [
+  { offsets: ORTHOGONAL,     slide: true,  types: ['R', 'Q'] },
+  { offsets: DIAGONAL_2D,    slide: true,  types: ['B', 'Q'] },
+  { offsets: DIAGONAL_3D,    slide: true,  types: ['T', 'Q'] },
+  { offsets: ALL_DIRECTIONS, slide: false, types: ['K', 'E'] },
+  { offsets: KNIGHT,         slide: false, types: ['N'] },
+  { offsets: ZEBRA,          slide: false, types: ['Z'] },
+];
+
+function isAttacked(cell: Location, byColor: PieceColor, at: Occupancy = pieceAt): boolean {
+  for (const { offsets, slide, types } of ATTACKERS) {
+    for (const [dl, dr, df] of offsets) {
+      for (let n = 1; ; n++) {
+        const loc = { level: cell.level + n * dl, rank: cell.rank + n * dr, file: cell.file + n * df };
+        if (!onBoard(loc)) break;
+        const p = at(loc);
+        if (p) {
+          if (p.color === byColor && types.includes(p.type)) return true;
+          break;
+        }
+        if (!slide) break;
+      }
+    }
+  }
+  // A pawn captures one rank forward plus one step in file or level, so it
+  // attacks from one rank behind the cell (from its own side's point of view).
+  const behind = byColor === 'white' ? -1 : 1;
+  for (const [dl, df] of [[0, 1], [0, -1], [1, 0], [-1, 0]]) {
+    const loc = { level: cell.level + dl, rank: cell.rank + behind, file: cell.file + df };
+    const p = onBoard(loc) ? at(loc) : undefined;
+    if (p && p.color === byColor && p.type === 'P') return true;
+  }
+  return false;
+}
+
+function kingLocation(color: PieceColor): Location | null {
+  return getBoardPositions().find((p) => p.type === 'K' && p.color === color)?.location ?? null;
+}
+
+// True if moving `piece` to `to` would leave its own king attacked.
+function leavesKingInCheck(piece: ChessPiece, to: Location): boolean {
+  const king = piece.type === 'K' ? to : kingLocation(piece.color);
+  if (!king) return false; // no king on the board (e.g. test positions)
+  return isAttacked(king, opponent(piece.color), afterMove(piece, to));
+}
+
 // ---- Per-piece move functions ----
 
-function getKingMoves(): LegalMovesList {
-  return { emptyCells: [], captures: [] };
+function getKingMoves(piece: ChessPiece): LegalMovesList {
+  return stepMoves(piece, ALL_DIRECTIONS); // check is applied in getLegalMoves
 }
 
 function getQueenMoves(piece: ChessPiece): LegalMovesList {
