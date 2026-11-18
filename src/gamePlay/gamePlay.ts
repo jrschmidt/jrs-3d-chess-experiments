@@ -23,9 +23,9 @@ export function getLegalMoves(piece: ChessPiece): LegalMovesList {
     case 'T':
       return getTritonMoves(piece);
     case 'N':
-      return getKnightMoves();
+      return getKnightMoves(piece);
     case 'Z':
-      return getZebraMoves();
+      return getZebraMoves(piece);
     case 'P':
       return getPawnMoves();
   }
@@ -61,6 +61,12 @@ const DIAGONAL_3D = expandSigns([[1, 1, 1]]);
 
 // Orthogonal + 2-d diagonal + 3-d diagonal → all 26 directions
 const ALL_DIRECTIONS = [...ORTHOGONAL, ...DIAGONAL_2D, ...DIAGONAL_3D];
+
+// Knight: (±2, ±1, ±0) (±1, ±2, ±0) (±2, ±0, ±1) (±0, ±2, ±1) (±1, ±0, ±2) (±0, ±1, ±2) → 24 jumps
+const KNIGHT = expandSigns([[2, 1, 0], [1, 2, 0], [2, 0, 1], [0, 2, 1], [1, 0, 2], [0, 1, 2]]);
+
+// Zebra: (±2, ±1, ±1) (±1, ±2, ±1) (±1, ±1, ±2) → 24 jumps
+const ZEBRA = expandSigns([[2, 1, 1], [1, 2, 1], [1, 1, 2]]);
 
 function onBoard({ level, rank, file }: Location): boolean {
   return level >= 1 && level <= LEVEL_MAX
@@ -134,12 +140,12 @@ function getTritonMoves(piece: ChessPiece): LegalMovesList {
   return slideMoves(piece, DIAGONAL_3D);
 }
 
-function getKnightMoves(): LegalMovesList {
-  return { emptyCells: [], captures: [] };
+function getKnightMoves(piece: ChessPiece): LegalMovesList {
+  return stepMoves(piece, KNIGHT);
 }
 
-function getZebraMoves(): LegalMovesList {
-  return { emptyCells: [], captures: [] };
+function getZebraMoves(piece: ChessPiece): LegalMovesList {
+  return stepMoves(piece, ZEBRA);
 }
 
 function getPawnMoves(): LegalMovesList {
