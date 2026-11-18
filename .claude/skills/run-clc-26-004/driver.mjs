@@ -156,7 +156,7 @@ try {
   // The view-option widget has one click target per row, in order Cube,
   // Front, Top, Side (see buildViewOption in src/display/widgets/viewOption.ts).
   // Front, Top and Side are slice views (one slice of the cube seen straight
-  // on — see SLICE_VIEWS in src/display/drawCube/drawCube.ts). Picking one
+  // on — see SLICE_VIEWS in src/display/drawSlice/drawSlice.ts). Picking one
   // should show only that view's group, keep the selected cell but reset
   // the other displayState fields to the view's initial state
   // (initDisplayStates in src/display/displayState.ts; checked through the
@@ -368,7 +368,7 @@ try {
       exitCode = 1;
     }
     // The flat views' icons all match; the cube's shrink with the cube when
-    // it has to clear the cell display (see shrinkCubeToClear in drawCube.ts).
+    // it has to clear the cell display (see shrinkCubeToClear in scene.ts).
     if (size !== flatIconSize) {
       console.error(`FAIL: ${label} icons are not the same size as the other flat views' icons`);
       exitCode = 1;

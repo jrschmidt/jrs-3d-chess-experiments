@@ -4,7 +4,7 @@ import { PITCH, TILT_DEGREES } from './constants.ts';
 // Isometric projection of the cube: from a cell (rank, level, file) to SVG
 // screen coordinates, and the screen-space outlines built from it (level
 // perimeters, visible chevrons, cell footprints). Pure math, no DOM. Every
-// function takes (rank, level, file), the argument order drawCube.ts uses.
+// function takes (rank, level, file), the argument order the views use.
 
 export interface Point {
   x: number;

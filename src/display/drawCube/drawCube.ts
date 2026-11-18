@@ -1,190 +1,24 @@
 // @ts-nocheck
-import { PIECE_ICONS } from '../render/pieceIcons.ts';
 import { piecesInDrawOrder } from '../drawOrder.ts';
-import { pieceAt, PIECE_NAMES, LEVEL_MAX, RANK_MAX, FILE_MAX } from '../../gameState/gameState.ts';
-import { PITCH } from '../render/constants.ts';
-import { svgEl, parseSvgFragment } from '../render/svg.ts';
+import { LEVEL_MAX, RANK_MAX, FILE_MAX } from '../../gameState/gameState.ts';
+import { svgEl } from '../render/svg.ts';
+import { renderPieceIcon } from '../render/pieceIcons.ts';
+import { emptyBounds, extendBounds } from '../render/bounds.ts';
 import {
   HALF, V_LEVEL, add, scale, projectCenter, pointsAttr,
   floorPerimeter, ceilingPerimeter, boundaryCorners, chevronPoints, verticalEdges,
   cellFootprint, cellFootprintInset,
 } from '../render/isoProjection.ts';
 import {
-  PERIMETER_COLOR, PERIMETER_HIGHLIGHT, CHECKER_COLORS, checkerColor,
-  isDarkCell, DIAG_COLORS, diagForCell,
+  PERIMETER_COLOR, PERIMETER_HIGHLIGHT, checkerColor, perimeterStroke,
+  isDarkCell, DIAG_COLORS, diagForCell, DIAG_SQUARE_MARGIN, DIAG_SQUARE_STROKE_WIDTH,
 } from '../render/cellColors.ts';
-import { buildCellPickerCube } from '../widgets/cellPickerCube.ts';
-import { buildDiagToggle } from '../widgets/diagToggle.ts';
-import { buildViewOption } from '../widgets/viewOption.ts';
-import { buildCellDisplay } from '../widgets/cellDisplay.ts';
-import { buildPlanePicker } from '../widgets/planePicker.ts';
-import { DISPLAY_CHANGE, TEXT_STYLE, emitDisplayChange } from '../widgets/widgetChrome.ts';
-import {
-  getView, getLevel, getRank, getFile, getShow3dDiagonals,
-  changeView, setPerspective, setLevel, setRank, setFile, setShow3dDiagonals,
-} from '../displayState.ts';
 
-const DIAG_SQUARE_MARGIN = 3;      // px gap between a diag square and the cell's outer edge
-const DIAG_SQUARE_STROKE_WIDTH = 3; // px width of the diag square's outline
-
-// Draws the icon for a (type, color) piece (e.g. "K"/"black" -> PIECE_ICONS
-// key "kb") centered on `center`, inside `parent`.
-const renderPieceIcon = (type, color, center, parent) => {
-  const iconKey = `${type.toLowerCase()}${color[0]}`;
-  const g = svgEl("g", { transform: `translate(${center.x.toFixed(2)}, ${center.y.toFixed(2)})` });
-  g.appendChild(parseSvgFragment(PIECE_ICONS[iconKey]));
-  parent.appendChild(g);
-  return g;
-};
-
-// Draws every piece into the cube, centered on its cell floor footprint,
-// back to front (see drawOrder.ts) so nearer icons paint over farther ones.
-// The slice views draw their own pieces (see refreshSliceViews), since
-// theirs change with the plane shown.
-export const renderPieceIcons = () => {
-  for (const { type, color, location } of piecesInDrawOrder('cube-view')) {
-    const { level, rank, file } = location;
-    const center = add(projectCenter(rank, level, file), scale(V_LEVEL, -HALF));
-    renderPieceIcon(type, color, center, cubeGroupEl);
-  }
-  // The pieces are placed after buildScene's first refresh.
-  refreshSliceViews();
-  refreshCellDisplay();
-};
-
-// --- Bounding-box helpers ---
-const extendBounds = (b, points) => {
-  for (const p of points) {
-    b.minX = Math.min(b.minX, p.x); b.maxX = Math.max(b.maxX, p.x);
-    b.minY = Math.min(b.minY, p.y); b.maxY = Math.max(b.maxY, p.y);
-  }
-};
-const mergeBounds = (b, other) => {
-  b.minX = Math.min(b.minX, other.minX); b.maxX = Math.max(b.maxX, other.maxX);
-  b.minY = Math.min(b.minY, other.minY); b.maxY = Math.max(b.maxY, other.maxY);
-};
-
-// A horizontal boundary is highlighted when it's the floor or ceiling of
-// the focused level (boundary indices focus-1 and focus — see
-// boundaryCorners above).
-const perimeterStroke = (boundaryIndex, focus) =>
-  (boundaryIndex === focus - 1 || boundaryIndex === focus) ? PERIMETER_HIGHLIGHT : PERIMETER_COLOR;
-
-// Repositions the 4 vertical highlight overlays to span the focused level,
-// from its floor boundary up to its ceiling boundary.
-const updateVerticalHighlights = (focus) => {
-  const lower = boundaryCorners(focus - 1);
-  const upper = boundaryCorners(focus);
-  for (const { el, corner } of verticalHighlightEls) {
-    const a = lower[corner], b = upper[corner];
-    el.setAttribute("x1", a.x); el.setAttribute("y1", a.y);
-    el.setAttribute("x2", b.x); el.setAttribute("y2", b.y);
-  }
-};
-
-// Populated by buildScene; used by refreshFocus to recolor checkers, diag
-// squares, and perimeter boundaries in place (no geometry change, except
-// the vertical highlights which reposition) when the focus level changes.
-let checkerPolys = [];
-let floorPolys = [];
-let verticalHighlightEls = [];
-// The diag-square overlay groups (cube and slice views), all shown or hidden
-// together by refreshDisplay.
-let diagGroupEls = [];
-
-// Populated by buildScene. refreshDisplay shows the current view's group
-// (see viewGroups), or the "THIS VIEW / NOT IMPLEMENTED" placeholder for a
-// view that isn't drawn yet. Piece icons are drawn into each view's group,
-// so they hide along with it.
-let cubeGroupEl = null;
-let sliceViewEls = {};
-let notImplementedEl = null;
-// The cube's title, outside cubeGroupEl (see buildScene), so shown and
-// hidden separately.
-let cubeTitleEl = null;
-
-// The group drawing each implemented view; views not listed (front-black,
-// side-black) show the placeholder.
-const viewGroups = () => ({ "cube-view": cubeGroupEl, ...sliceViewEls });
-
-const refreshFocus = () => {
-  const focusLevel = getLevel();
-  for (const { el, level, variant } of checkerPolys) {
-    el.setAttribute("fill", checkerColor(level, variant, focusLevel));
-  }
-  for (const { el, boundaryIndex } of floorPolys) {
-    el.setAttribute("stroke", perimeterStroke(boundaryIndex, focusLevel));
-  }
-  updateVerticalHighlights(focusLevel);
-};
-
-// Brings everything that depends on displayState up to date. Cheap enough
-// to run in full after any change, rather than tracking which field moved.
-const refreshDisplay = () => {
-  refreshFocus();
-  for (const el of diagGroupEls) {
-    el.setAttribute("display", getShow3dDiagonals() ? "inline" : "none");
-  }
-  const groups = viewGroups();
-  for (const [view, el] of Object.entries(groups)) {
-    el.setAttribute("display", view === getView() ? "inline" : "none");
-  }
-  notImplementedEl.setAttribute("display", getView() in groups ? "none" : "inline");
-  cubeTitleEl.setAttribute("display", getView() === "cube-view" ? "inline" : "none");
-  refreshSliceViews();
-  // A view change can reset fields other widgets own, so resync them.
-  cellPickerCubeEl.setValue({ level: getLevel(), rank: getRank(), file: getFile() });
-  diagToggleEl.setValue(getShow3dDiagonals());
-  refreshCellDisplay();
-};
-
-// Shows the focus cell (level, rank, file) in the cell display: its focus
-// checker color, its diagonal color when diagonals are on, and its piece.
-const refreshCellDisplay = () => {
-  const level = getLevel(), rank = getRank(), file = getFile();
-  const isCell = level !== null && rank !== null && file !== null;
-  const piece = isCell ? pieceAt({ level, rank, file }) : undefined;
-  cellDisplayEl.update({
-    level, rank, file,
-    fill: isCell ? CHECKER_COLORS.focus[isDarkCell(rank, level, file) ? "dark" : "light"] : null,
-    diagColor: isCell && getShow3dDiagonals() ? DIAG_COLORS[diagForCell(rank, level, file)] : null,
-    piece: piece ? { type: piece.type, color: piece.color, name: PIECE_NAMES[piece.type] } : null,
-  });
-};
-
-// Every widget reports its changes as a display-change event {field, value}
-// (see emitDisplayChange in widgets/widgetChrome.ts); this maps each field
-// to the displayState setter that records it. A view change also resets
-// the other fields, except the selected cell, when that view has an
-// initial state (see changeView).
-const SETTERS = {
-  view: changeView,
-  perspective: setPerspective,
-  level: setLevel,
-  rank: setRank,
-  file: setFile,
-  show3dDiagonals: setShow3dDiagonals,
-};
-
-const onDisplayChange = (e) => {
-  const { field, value } = e.detail;
-  SETTERS[field](value);
-  refreshDisplay();
-};
-
-// Attrs for a cell polygon at `level`: a clip-path masking it to its
-// visible chevron portion, or none for the always-fully-visible top level.
-const clipAttrsForLevel = (level) =>
-  level < LEVEL_MAX ? { "clip-path": `url(#visible-clip-${level})` } : {};
-
-const addEdgeLine = (group, bottom, top, bbox) => {
-  group.appendChild(svgEl("line", {
-    x1: bottom.x, y1: bottom.y, x2: top.x, y2: top.y,
-    stroke: PERIMETER_COLOR,
-    "stroke-width": 3,
-  }));
-  extendBounds(bbox, [bottom, top]);
-};
+// The cube view: all LEVEL_MAX levels drawn as an isometric cube, each
+// level's checkerboard clipped to its visible (chevron-shaped) portion, with
+// the focus level shown brightest and its frame lines highlighted. Built
+// once by buildCubeView; the scene (scene.ts) calls its refresh after every
+// display-state change.
 
 // Calls fn(rank, level, file) once for every cell in the cube.
 const forEachCell = (fn) => {
@@ -196,6 +30,11 @@ const forEachCell = (fn) => {
     }
   }
 };
+
+// Attrs for a cell polygon at `level`: a clip-path masking it to its
+// visible chevron portion, or none for the always-fully-visible top level.
+const clipAttrsForLevel = (level) =>
+  level < LEVEL_MAX ? { "clip-path": `url(#visible-clip-${level})` } : {};
 
 // One clipPath per non-top level, masking a cell to just its visible
 // (chevron-shaped) portion of that level's floor.
@@ -210,15 +49,15 @@ const buildClipDefs = () => {
 };
 
 // The checkerboard floor of every cell, recorded in checkerPolys so
-// refreshFocus can recolor it when the focus level changes.
-const buildCheckers = (bbox) => {
+// refresh can recolor it when the focus level changes.
+const buildCheckers = (bbox, checkerPolys, focusLevel) => {
   const checkerGroup = svgEl("g", { id: "checkers" });
   forEachCell((rank, level, file) => {
     const corners = cellFootprint(rank, level, file);
     const variant = isDarkCell(rank, level, file) ? "dark" : "light";
     const poly = svgEl("polygon", {
       points: pointsAttr(corners),
-      fill: checkerColor(level, variant, getLevel()),
+      fill: checkerColor(level, variant, focusLevel),
       stroke: "none",
       ...clipAttrsForLevel(level),
     });
@@ -231,9 +70,8 @@ const buildCheckers = (bbox) => {
 
 // The diagonal-square overlay: one inset outline per cell, colored by its
 // diagonal set. Inset inside each cell, so it never extends the bbox.
-const buildDiagSquares = () => {
-  const diagGroupEl = svgEl("g", { id: "diag-squares", display: getShow3dDiagonals() ? "inline" : "none" });
-  diagGroupEls.push(diagGroupEl);
+const buildDiagSquares = (show) => {
+  const diagGroupEl = svgEl("g", { id: "diag-squares", display: show ? "inline" : "none" });
   forEachCell((rank, level, file) => {
     const diagId = diagForCell(rank, level, file);
     const diagCorners = cellFootprintInset(rank, level, file, DIAG_SQUARE_MARGIN);
@@ -248,9 +86,31 @@ const buildDiagSquares = () => {
   return diagGroupEl;
 };
 
+const addEdgeLine = (group, bottom, top, bbox) => {
+  group.appendChild(svgEl("line", {
+    x1: bottom.x, y1: bottom.y, x2: top.x, y2: top.y,
+    stroke: PERIMETER_COLOR,
+    "stroke-width": 3,
+  }));
+  extendBounds(bbox, [bottom, top]);
+};
+
+// Repositions the vertical highlight overlays to span the focused level,
+// from its floor boundary up to its ceiling boundary.
+const updateVerticalHighlights = (verticalHighlightEls, focus) => {
+  const lower = boundaryCorners(focus - 1);
+  const upper = boundaryCorners(focus);
+  for (const { el, corner } of verticalHighlightEls) {
+    const a = lower[corner], b = upper[corner];
+    el.setAttribute("x1", a.x); el.setAttribute("y1", a.y);
+    el.setAttribute("x2", b.x); el.setAttribute("y2", b.y);
+  }
+};
+
 // The cube's wireframe: floor perimeters, vertical edges, ceiling, and the
-// focused level's vertical highlight overlays.
-const buildFrame = (bbox) => {
+// focused level's vertical highlight overlays. Records the boundary lines
+// in frameLines and the overlays in verticalHighlightEls, for refresh.
+const buildFrame = (bbox, frameLines, verticalHighlightEls, focusLevel) => {
   const floorGroup = svgEl("g", { id: "floors" });
 
   for (let level = 1; level <= LEVEL_MAX; level++) {
@@ -263,11 +123,11 @@ const buildFrame = (bbox) => {
     const poly = svgEl("polyline", {
       points: pointsAttr([corners[3], corners[0], corners[1]]),
       fill: "none",
-      stroke: perimeterStroke(boundaryIndex, getLevel()),
+      stroke: perimeterStroke(boundaryIndex, focusLevel),
       "stroke-width": 5,
       "stroke-linejoin": "round",
     });
-    floorPolys.push({ el: poly, boundaryIndex });
+    frameLines.push({ el: poly, boundaryIndex });
     floorGroup.appendChild(poly);
     extendBounds(bbox, corners);
   }
@@ -277,8 +137,8 @@ const buildFrame = (bbox) => {
   }
 
   // The back-right corner (A) is otherwise fully hidden — see verticalEdges
-  // above — but its Level-5 segment bounds the always-visible ceiling face,
-  // so just that top-level span is drawn on its own.
+  // in isoProjection.ts — but its Level-5 segment bounds the always-visible
+  // ceiling face, so just that top-level span is drawn on its own.
   {
     const bottom = boundaryCorners(LEVEL_MAX - 1).backRight;
     const top = boundaryCorners(LEVEL_MAX).backRight;
@@ -291,11 +151,11 @@ const buildFrame = (bbox) => {
     const poly = svgEl("polygon", {
       points: pointsAttr(corners),
       fill: "none",
-      stroke: perimeterStroke(boundaryIndex, getLevel()),
+      stroke: perimeterStroke(boundaryIndex, focusLevel),
       "stroke-width": 3,
       "stroke-linejoin": "round",
     });
-    floorPolys.push({ el: poly, boundaryIndex });
+    frameLines.push({ el: poly, boundaryIndex });
     floorGroup.appendChild(poly);
     extendBounds(bbox, corners);
   }
@@ -307,358 +167,53 @@ const buildFrame = (bbox) => {
     verticalHighlightEls.push({ el, corner });
     floorGroup.appendChild(el);
   }
-  updateVerticalHighlights(getLevel());
+  updateVerticalHighlights(verticalHighlightEls, focusLevel);
 
   return floorGroup;
 };
 
-// Slice views: one slice of the cube seen straight on, as a flat cols x rows
-// grid of PITCH-sized squares, column 1 at the left and row 1 at the bottom.
-// They use the cube's scale and viewBox, so piece icons are the same size on
-// screen and no widget moves. Each shows the plane `plane()` picks from
-// displayState (falling back to the plane its view starts on when that
-// field is null), and maps a grid square (col, row) of that plane to its
-// cell; `rowsAreLevels` says whether the rows are levels (front, side) or
-// ranks (top), which decides how the frame shows the focus level. `title`
-// is drawn above the grid; `planeField` (with its caption and maximum) is
-// the field the view's plane picker changes.
-const SLICE_VIEWS = {
-  // The focus rank, seen from in front of it (white's side).
-  "front-white": {
-    id: "front-view", prefix: "front", cols: FILE_MAX, rows: LEVEL_MAX, rowsAreLevels: true,
-    title: "Front View", planeField: "rank", planeLabel: "RANK", planeMax: RANK_MAX,
-    plane: () => getRank() ?? 1,
-    cellAt: (col, row, rank) => ({ rank, level: row, file: col }),
-  },
-  // The focus file, seen from outside it (white's left): rank 8 at the left
-  // and rank 1 at the right, as on the cube's visible file-1 face.
-  "side-white": {
-    id: "side-view", prefix: "side", cols: RANK_MAX, rows: LEVEL_MAX, rowsAreLevels: true,
-    title: "Side View", planeField: "file", planeLabel: "FILE", planeMax: FILE_MAX,
-    plane: () => getFile() ?? 1,
-    cellAt: (col, row, file) => ({ rank: RANK_MAX + 1 - col, level: row, file }),
-  },
-  // The focus level, seen from above: rank 1 (white) at the bottom, file 1
-  // at the left.
-  "top-view": {
-    id: "top-view", prefix: "top", cols: FILE_MAX, rows: RANK_MAX, rowsAreLevels: false,
-    title: "Top View", planeField: "level", planeLabel: "LEVEL", planeMax: LEVEL_MAX,
-    plane: () => getLevel() ?? LEVEL_MAX,
-    cellAt: (col, row, level) => ({ rank: row, level, file: col }),
-  },
-};
-
-// Each built slice view: its config, grid center, squares and piece group,
-// so refreshSliceViews can redraw it. Populated by buildSliceView.
-let sliceViews = [];
-
-// The center of grid square (col, row) in a grid of `cols` x `rows`
-// centered on `center`.
-const sliceSquareCenter = ({ cols, rows }, center, col, row) => ({
-  x: center.x + (col - (cols + 1) / 2) * PITCH,
-  y: center.y - (row - (rows + 1) / 2) * PITCH,
-});
-
-// Calls fn(col, row) once for every square in a slice view's grid.
-const forEachSliceSquare = (config, fn) => {
-  for (let row = 1; row <= config.rows; row++) {
-    for (let col = 1; col <= config.cols; col++) {
-      fn(col, row);
-    }
-  }
-};
-
-// Recolors every slice view's squares and redraws its pieces for the plane
-// it currently shows. All three are kept current, so a hidden view is
-// already right when it's shown.
-const refreshSliceViews = () => {
-  for (const { config, center, squares, piecesEl, planePicker } of sliceViews) {
-    const plane = config.plane();
-    planePicker.setValue(plane);
-    piecesEl.replaceChildren();
-    for (const { col, row, checkerEl, diagEl } of squares) {
-      const cell = config.cellAt(col, row, plane);
-      const { rank, level, file } = cell;
-      const variant = isDarkCell(rank, level, file) ? "dark" : "light";
-      checkerEl.setAttribute("fill", checkerColor(level, variant, getLevel()));
-      diagEl.setAttribute("stroke", DIAG_COLORS[diagForCell(rank, level, file)]);
-      const piece = pieceAt(cell);
-      if (piece) renderPieceIcon(piece.type, piece.color, sliceSquareCenter(config, center, col, row), piecesEl);
-    }
-  }
-};
-
-// A view's title ("Cube View", "Front View", ...), centered on x with its
-// baseline a little above topY (the top of the view's drawing).
-const buildViewTitle = (text, x, topY, id) => {
-  const el = svgEl("text", {
-    id, x, y: topY - PITCH * 0.2,
-    "text-anchor": "middle",
-    "font-size": PITCH * 0.4,
-    ...TEXT_STYLE,
-  });
-  el.textContent = text;
-  return el;
-};
-
-// Built centered on the cube's bbox (pass it before the widgets are merged
-// in), which it fits inside, so it doesn't extend the bbox. Only the
-// geometry is built here; refreshSliceViews colors the squares and draws
-// the pieces for the plane shown. Its frame lines join floorPolys, so
-// refreshFocus highlights the focus level here as in the cube; its diag
-// squares join diagGroupEls, so the diag toggle shows them as in the cube.
-const buildSliceView = (config, bbox) => {
-  const center = { x: (bbox.minX + bbox.maxX) / 2, y: (bbox.minY + bbox.maxY) / 2 };
-  const squareCenter = (col, row) => sliceSquareCenter(config, center, col, row);
-  const viewEl = svgEl("g", { id: config.id, display: "none" });
-
-  // Each square's checker and diag square (inset as in the cube — see
-  // buildDiagSquares). Only the checkers take clicks; the diag squares,
-  // frame and pieces drawn over them pass clicks through.
-  const checkerGroup = svgEl("g", { id: `${config.prefix}-checkers` });
-  const diagGroup = svgEl("g", {
-    id: `${config.prefix}-diag-squares`, display: getShow3dDiagonals() ? "inline" : "none",
-    "pointer-events": "none",
-  });
-  const half = PITCH / 2 - DIAG_SQUARE_MARGIN;
-  const squares = [];
-  forEachSliceSquare(config, (col, row) => {
-    const c = squareCenter(col, row);
-    const checkerEl = svgEl("rect", {
-      x: c.x - PITCH / 2, y: c.y - PITCH / 2, width: PITCH, height: PITCH,
-      style: "cursor: pointer",
-    });
-    // Clicking a square selects its cell in the plane on screen: one
-    // display-change per field, handled like the cell picker cube's.
-    checkerEl.addEventListener("click", () => {
-      const { level, rank, file } = config.cellAt(col, row, config.plane());
-      emitDisplayChange(checkerEl, "level", level);
-      emitDisplayChange(checkerEl, "rank", rank);
-      emitDisplayChange(checkerEl, "file", file);
-    });
-    checkerGroup.appendChild(checkerEl);
-    const diagEl = svgEl("rect", {
-      x: c.x - half, y: c.y - half, width: half * 2, height: half * 2,
-      fill: "none",
-      "stroke-width": DIAG_SQUARE_STROKE_WIDTH,
-    });
-    diagGroup.appendChild(diagEl);
-    squares.push({ col, row, checkerEl, diagEl });
-  });
-  viewEl.appendChild(checkerGroup);
-  diagGroupEls.push(diagGroup);
-  viewEl.appendChild(diagGroup);
-
-  const frameGroup = svgEl("g", { id: `${config.prefix}-frame`, "pointer-events": "none" });
-  const left = squareCenter(1, 1).x - PITCH / 2;
-  const right = squareCenter(config.cols, 1).x + PITCH / 2;
-  // The y of the line below row `i + 1` (i = 0 is the bottom edge,
-  // config.rows the top edge).
-  const rowBoundaryY = (i) => squareCenter(1, i + 1).y + PITCH / 2;
-  if (config.rowsAreLevels) {
-    for (const x of [left, right]) {
-      frameGroup.appendChild(svgEl("line", {
-        x1: x, y1: rowBoundaryY(0), x2: x, y2: rowBoundaryY(config.rows),
-        stroke: PERIMETER_COLOR, "stroke-width": 3,
-      }));
-    }
-    // One line per level boundary (indexed as in boundaryCorners), drawn
-    // after the side edges so the highlighted ones paint over them.
-    for (let boundaryIndex = 0; boundaryIndex <= LEVEL_MAX; boundaryIndex++) {
-      const y = rowBoundaryY(boundaryIndex);
-      const line = svgEl("line", {
-        x1: left, y1: y, x2: right, y2: y,
-        stroke: perimeterStroke(boundaryIndex, getLevel()),
-        "stroke-width": 3,
-        "stroke-linecap": "square",
-      });
-      floorPolys.push({ el: line, boundaryIndex });
-      frameGroup.appendChild(line);
-    }
-  } else {
-    // Seen from above, the plane shown is always the focus level: one
-    // outline, always highlighted.
-    frameGroup.appendChild(svgEl("rect", {
-      x: left, y: rowBoundaryY(config.rows), width: right - left, height: rowBoundaryY(0) - rowBoundaryY(config.rows),
-      fill: "none",
-      stroke: PERIMETER_HIGHLIGHT,
-      "stroke-width": 3,
-    }));
-  }
-  viewEl.appendChild(frameGroup);
-
-  const piecesEl = svgEl("g", { id: `${config.prefix}-pieces`, "pointer-events": "none" });
-  viewEl.appendChild(piecesEl);
-
-  viewEl.appendChild(buildViewTitle(config.title, center.x, rowBoundaryY(config.rows), `${config.prefix}-title`));
-
-  // The plane picker, a gap right of the grid, centered on it.
-  const planePicker = buildPlanePicker(right + PITCH * 0.3, center.y, {
-    id: `${config.prefix}-plane-picker`,
-    field: config.planeField, label: config.planeLabel, max: config.planeMax,
-    initial: config.plane(),
-  });
-  viewEl.appendChild(planePicker.el);
-
-  sliceViews.push({ config, center, squares, piecesEl, planePicker });
-  return viewEl;
-};
-
-const NOT_IMPLEMENTED_COLOR = "#33cc33";
-
-// Two large green lines, "THIS VIEW" / "NOT IMPLEMENTED", centered on the
-// cube's bbox (pass it before the widgets are merged in). Shown in place of
-// the hidden cube, so the viewBox — and every widget's position — is the
-// same in every view.
-const buildNotImplemented = (bbox) => {
-  const g = svgEl("g", { id: "not-implemented", display: "none" });
-  const cx = (bbox.minX + bbox.maxX) / 2;
-  const cy = (bbox.minY + bbox.maxY) / 2;
-  const fontSize = PITCH * 0.8;
-  ["THIS VIEW", "NOT IMPLEMENTED"].forEach((line, i) => {
-    const text = svgEl("text", {
-      x: cx, y: cy + fontSize * 0.6 * (i === 0 ? -1 : 1),
-      "text-anchor": "middle",
-      "dominant-baseline": "central",
-      "font-size": fontSize,
-      "font-weight": "bold",
-      "font-family": TEXT_STYLE["font-family"],
-      fill: NOT_IMPLEMENTED_COLOR,
-    });
-    text.textContent = line;
-    g.appendChild(text);
-  });
-  return g;
-};
-
-// The cell picker cube just right of the cube, level with its bottom — so bbox
-// must already cover the whole cube — then the diagonal toggle at the
-// right, halfway down, with the view selector just to its left.
-const buildControls = (svg, bbox) => {
-  // Halfway down the page: the viewBox is centered vertically on the page,
-  // and no widget extends the bbox vertically past the cube.
-  const centerY = (bbox.minY + bbox.maxY) / 2;
-  const gap = PITCH * 0.2;
-
-  const cellPickerCube = buildCellPickerCube(bbox.maxX + gap, bbox.maxY, {
-    initial: { level: getLevel(), rank: getRank(), file: getFile() },
-    checkerColors: CHECKER_COLORS.focus,
-    edgeColor: PERIMETER_COLOR,
-    isDarkCell,
-  });
-  svg.appendChild(cellPickerCube.el);
-  mergeBounds(bbox, cellPickerCube);
-  cellPickerCubeEl = cellPickerCube;
-
-  // Right-aligned with the cell picker cube, the scene's rightmost point.
-  const diagToggle = buildDiagToggle(cellPickerCube.maxX, centerY, {
-    initial: getShow3dDiagonals(),
-  });
-  svg.appendChild(diagToggle.el);
-  mergeBounds(bbox, diagToggle);
-  diagToggleEl = diagToggle;
-
-  // The view selector sits a gap left of the diag toggle, centered on the
-  // same height.
-  const viewOption = buildViewOption(diagToggle.minX - gap, centerY, {
-    initial: getView(),
-  });
-  svg.appendChild(viewOption.el);
-  mergeBounds(bbox, viewOption);
-};
-
-// Populated by buildScene; refreshCellDisplay updates it.
-let cellDisplayEl = null;
-
-// Populated by buildControls; refreshDisplay resyncs them to displayState.
-let cellPickerCubeEl = null;
-let diagToggleEl = null;
-
-// Returns the viewBox's top-right corner.
-const fitViewBox = (svg, bbox) => {
-  const pad = PITCH * 0.6;
-  const vbX = bbox.minX - pad, vbY = bbox.minY - pad;
-  const vbW = (bbox.maxX - bbox.minX) + pad * 2, vbH = (bbox.maxY - bbox.minY) + pad * 2;
-  svg.setAttribute("viewBox", `${vbX} ${vbY} ${vbW} ${vbH}`);
-  svg.setAttribute("preserveAspectRatio", "xMidYMid meet");
-  return { x: vbX + vbW, y: vbY };
-};
-
-// The cell display's margin from the top and right edges of the page.
-const CELL_DISPLAY_MARGIN = PITCH;
-
-// Moves the cell display so it sits CELL_DISPLAY_MARGIN in from the page's
-// top-right corner. It's built that far in from the viewBox's corner, and
-// the page's corner is always at or beyond the viewBox's (the viewBox is
-// letterboxed with "meet"), so this only ever moves it up or right, away
-// from the rest of the scene. Reruns on every resize.
-const positionCellDisplay = (svg) => {
-  const rect = svg.getBoundingClientRect();
-  const pt = svg.createSVGPoint();
-  pt.x = rect.right; pt.y = rect.top;
-  const corner = pt.matrixTransform(svg.getScreenCTM().inverse());
-  const dx = Math.max(0, corner.x - CELL_DISPLAY_MARGIN - cellDisplayEl.maxX);
-  const dy = Math.min(0, corner.y + CELL_DISPLAY_MARGIN - cellDisplayEl.minY);
-  cellDisplayEl.el.setAttribute("transform", `translate(${dx.toFixed(2)}, ${dy.toFixed(2)})`);
-};
-
-// Shrinks the cube about its bottom-left corner, just enough that its right
-// edge clears the cell display's left edge. Everything else is laid out
-// from the unscaled cube, so nothing else moves; the cube's piece icons and
-// diag squares are inside cubeGroupEl, so they shrink with it.
-const shrinkCubeToClear = (cubeBbox, clearX) => {
-  const px = cubeBbox.minX, py = cubeBbox.maxY;
-  const k = Math.min(1, (clearX - px) / (cubeBbox.maxX - px));
-  cubeGroupEl.setAttribute("transform",
-    `translate(${px.toFixed(2)}, ${py.toFixed(2)}) scale(${k.toFixed(4)}) translate(${(-px).toFixed(2)}, ${(-py).toFixed(2)})`);
-  return k;
-};
-
-export const buildScene = () => {
-  const svg = document.getElementById("scene");
-  checkerPolys = [];
-  floorPolys = [];
-  verticalHighlightEls = [];
-  diagGroupEls = [];
-  sliceViews = [];
-  sliceViewEls = {};
-
-  const bbox = { minX: Infinity, minY: Infinity, maxX: -Infinity, maxY: -Infinity };
+// Builds the cube view for the starting display state. Returns a
+// ViewController (see viewController.ts) plus:
+// - bbox: the cube's unscaled screen bounds, which the scene lays out around.
+// - drawPieces(): draws every piece into the cube, back to front (see
+//   drawOrder.ts) so nearer icons paint over farther ones. The cube's
+//   pieces are drawn once, after the game state is set up; the slice views
+//   redraw theirs on every refresh, since they change with the plane shown.
+export const buildCubeView = (state) => {
+  const checkerPolys = [];
+  const frameLines = [];
+  const verticalHighlightEls = [];
+  const bbox = emptyBounds();
 
   // Append order is paint order: checkers under diag squares under the frame.
-  svg.appendChild(buildClipDefs());
-  cubeGroupEl = svgEl("g", { id: "cube" });
-  cubeGroupEl.appendChild(buildCheckers(bbox));
-  cubeGroupEl.appendChild(buildDiagSquares());
-  cubeGroupEl.appendChild(buildFrame(bbox));
-  svg.appendChild(cubeGroupEl);
+  const el = svgEl("g", { id: "cube" });
+  el.appendChild(buildClipDefs());
+  el.appendChild(buildCheckers(bbox, checkerPolys, state.level));
+  const diagGroupEl = buildDiagSquares(state.show3dDiagonals);
+  el.appendChild(diagGroupEl);
+  el.appendChild(buildFrame(bbox, frameLines, verticalHighlightEls, state.level));
 
-  for (const [view, config] of Object.entries(SLICE_VIEWS)) {
-    sliceViewEls[view] = buildSliceView(config, bbox);
-    svg.appendChild(sliceViewEls[view]);
-  }
+  // Recolors checkers and frame lines in place (no geometry change, except
+  // the vertical highlights, which reposition) for the focus level, and
+  // shows or hides the diag squares.
+  const refresh = ({ level, show3dDiagonals }) => {
+    for (const { el, level: cellLevel, variant } of checkerPolys) {
+      el.setAttribute("fill", checkerColor(cellLevel, variant, level));
+    }
+    for (const { el, boundaryIndex } of frameLines) {
+      el.setAttribute("stroke", perimeterStroke(boundaryIndex, level));
+    }
+    updateVerticalHighlights(verticalHighlightEls, level);
+    diagGroupEl.setAttribute("display", show3dDiagonals ? "inline" : "none");
+  };
 
-  notImplementedEl = buildNotImplemented(bbox);
-  svg.appendChild(notImplementedEl);
+  const drawPieces = () => {
+    for (const { type, color, location } of piecesInDrawOrder('cube-view')) {
+      const { level, rank, file } = location;
+      const center = add(projectCenter(rank, level, file), scale(V_LEVEL, -HALF));
+      renderPieceIcon(type, color, center, el);
+    }
+  };
 
-  const cubeBbox = { ...bbox };
-  buildControls(svg, bbox);
-  const vbCorner = fitViewBox(svg, bbox);
-
-  cellDisplayEl = buildCellDisplay(vbCorner.x - CELL_DISPLAY_MARGIN, vbCorner.y + CELL_DISPLAY_MARGIN);
-  svg.appendChild(cellDisplayEl.el);
-  const k = shrinkCubeToClear(cubeBbox, cellDisplayEl.minX - PITCH * 0.3);
-
-  // Outside cubeGroupEl, so it doesn't shrink with the cube, but placed
-  // over the shrunken cube (scaled about its bottom-left corner). It sits
-  // in the viewBox's top padding (see fitViewBox).
-  const { minX, maxX, minY, maxY } = cubeBbox;
-  cubeTitleEl = buildViewTitle("Cube View", minX + k * ((minX + maxX) / 2 - minX), maxY - k * (maxY - minY), "cube-title");
-  svg.appendChild(cubeTitleEl);
-
-  positionCellDisplay(svg);
-  window.addEventListener("resize", () => positionCellDisplay(svg));
-
-  svg.addEventListener(DISPLAY_CHANGE, onDisplayChange);
-  refreshDisplay();
+  return { el, bbox, refresh, drawPieces };
 };

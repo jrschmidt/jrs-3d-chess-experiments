@@ -1,8 +1,9 @@
 // @ts-nocheck
 import { svgEl } from '../render/svg.ts';
+import { PITCH } from '../render/constants.ts';
 
 // Event every widget fires when the user changes a displayState field; it
-// bubbles up to the listener on #scene (see drawCube.ts), which calls the
+// bubbles up to the listener on #scene (see scene.ts), which calls the
 // matching displayState setter and redraws.
 export const DISPLAY_CHANGE = "display-change";
 
@@ -11,6 +12,19 @@ export const emitDisplayChange = (el, field, value) =>
 
 // --- Widget chrome helpers (shared by all widgets) ---
 export const TEXT_STYLE = { "font-family": "system-ui, sans-serif", fill: "#cdd3de" };
+
+// A view's title ("Cube View", "Front View", ...), centered on x with its
+// baseline a little above topY (the top of the view's drawing).
+export const buildViewTitle = (text, x, topY, id) => {
+  const el = svgEl("text", {
+    id, x, y: topY - PITCH * 0.2,
+    "text-anchor": "middle",
+    "font-size": PITCH * 0.4,
+    ...TEXT_STYLE,
+  });
+  el.textContent = text;
+  return el;
+};
 
 export const makePanelRect = (x0, y0, w, h) =>
   svgEl("rect", {

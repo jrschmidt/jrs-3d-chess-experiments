@@ -1,5 +1,8 @@
 // SVG code for game piece icons
 
+import { svgEl, parseSvgFragment } from './svg.ts';
+import type { Point } from './isoProjection.ts';
+
 
 // KW - White King
 const ICON_K_W = `
@@ -397,3 +400,14 @@ export const PIECE_ICONS = {
   pw: ICON_P_W,
   pb: ICON_P_B,
 } as const;
+
+// Draws the icon for a (type, color) piece (e.g. "K"/"black" -> PIECE_ICONS
+// key "kb") centered on `center`, inside `parent`. Used by the cube and the
+// slice views.
+export const renderPieceIcon = (type: string, color: string, center: Point, parent: Element): SVGGElement => {
+  const iconKey = `${type.toLowerCase()}${color[0]}` as keyof typeof PIECE_ICONS;
+  const g = svgEl("g", { transform: `translate(${center.x.toFixed(2)}, ${center.y.toFixed(2)})` });
+  g.appendChild(parseSvgFragment(PIECE_ICONS[iconKey]));
+  parent.appendChild(g);
+  return g;
+};

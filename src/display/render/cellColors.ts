@@ -1,6 +1,6 @@
 // Cell colors shared by the cube and slice views: the checkerboard, the
 // frame lines, and the four 3-D diagonal sets. Every function here takes
-// (rank, level, file), the argument order drawCube.ts uses throughout.
+// (rank, level, file), the argument order the views use throughout.
 
 // A "floor" is a thin outline tracing the full rank x file perimeter of each
 // level — a subtle visual aid for telling the five levels of the cube apart.
@@ -9,6 +9,13 @@
 // wider than one level's vertical spacing.)
 export const PERIMETER_COLOR = "#505050";
 export const PERIMETER_HIGHLIGHT = "#999999";
+
+// A horizontal boundary is highlighted when it's the floor or ceiling of
+// the focused level (boundary indices focus-1 and focus — see
+// boundaryCorners in isoProjection.ts).
+export const perimeterStroke = (boundaryIndex: number, focus: number | null): string =>
+  focus !== null && (boundaryIndex === focus - 1 || boundaryIndex === focus)
+    ? PERIMETER_HIGHLIGHT : PERIMETER_COLOR;
 
 export type CheckerVariant = 'light' | 'dark';
 
@@ -56,6 +63,11 @@ export const DIAG_COLORS: Readonly<Record<DiagId, string>> = {
   diag_c: DIAG_ORANGE,
   diag_d: DIAG_GREEN,
 };
+
+// Each cell's diag square is an outline in its DIAG_COLORS color, inset
+// inside the cell, in both the cube and the slice views.
+export const DIAG_SQUARE_MARGIN = 3;       // px gap between a diag square and the cell's outer edge
+export const DIAG_SQUARE_STROKE_WIDTH = 3; // px width of the diag square's outline
 
 // Diagonal membership: every cell (l, r, f) = (level, rank, file) belongs to
 // exactly one of four mutually exclusive sets of 3D-diagonally-adjacent
