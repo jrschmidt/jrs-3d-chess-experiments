@@ -28,7 +28,7 @@ The entry point is `index.html` (a single `<svg id="scene">`), which loads `src/
 There are two kinds of state, and they live in separate places:
 
 - **Gameplay state** is in `src/gameState/gameState.ts`: the list of pieces, plus a `piecesByCell` index keyed `"level,rank,file"`, kept in sync by `placeGamePiece`/`removeGamePiece`/`resetGameState`. Look pieces up with `pieceAt(location)`. It also defines the board size, `LEVEL_MAX`/`RANK_MAX`/`FILE_MAX`. This directory holds gameplay state only; render and UI state never goes here.
-- **Display state** is in `src/display/displayState.ts`: the view, perspective, focus `level`/`rank`/`file` (the selected cell), `show3dDiagonals` and `cellVisibility`. It's a private object, read and written only through the getters and setters. `changeView(view)` resets every field to that view's entry in `initDisplayStates` but keeps the selected cell. A setter changes only its own field. Add a cross-field rule only when the user asks for that specific rule.
+- **Display state** is in `src/display/displayState.ts`: the view, perspective, focus `level`/`rank`/`file` (the selected cell), `show3dDiagonals` and `cellVisibility`. It's a private object, read and written only through the getters and setters. `changeView(view)` resets every field to that view's entry in `initDisplayStates` but keeps the selected cell and `show3dDiagonals`. A setter changes only its own field. Add a cross-field rule only when the user asks for that specific rule.
 
 Widgets and the scene talk through events:
 

@@ -24,8 +24,8 @@ export interface DisplayState {
 // Initial display state for each view, added one view at a time. Every
 // entry is a complete DisplayState; views without one yet are just absent.
 // 'cube-view' is required, since it's the state displayState starts in.
-// The selected cell (level, rank, file) carries over on a view change (see
-// changeView), so only cube-view's is used, as the startup cell.
+// The selected cell (level, rank, file) and show3dDiagonals carry over on a
+// view change (see changeView), so only cube-view's are used, at startup.
 const initDisplayStates: Readonly<
   { 'cube-view': DisplayState } & Partial<Record<ViewName, DisplayState>>
 > = {
@@ -91,12 +91,13 @@ export const setInitDisplayState = (): void => {
 };
 
 // Switches to `view`. If that view has an initial display state, every
-// field except the selected cell (level, rank, file) is reset to it;
-// otherwise only the view changes.
+// field except the selected cell (level, rank, file) and show3dDiagonals is
+// reset to it; otherwise only the view changes.
 export const changeView = (view: ViewName): void => {
   const init = initDisplayStates[view];
   if (init) {
-    setDisplayState({ ...init, level: displayState.level, rank: displayState.rank, file: displayState.file });
+    const { level, rank, file, show3dDiagonals } = displayState;
+    setDisplayState({ ...init, level, rank, file, show3dDiagonals });
   } else {
     setView(view);
   }

@@ -301,7 +301,7 @@ try {
   // The cell picked above (the black Triton at 2,8,1) carries into every
   // view; it differs from each view's preset cell (front 3,1,3, top 5,4,3,
   // side 3,4,1, cube 1,4,1), so a reset would show. Diagonals are on going
-  // into Front, and must reset to off. Piece counts are for the carried
+  // into Front, and carry over (stay on) through every view. Piece counts are for the carried
   // planes: rank 8, level 2, file 1.
   const CARRIED = { level: 2, rank: 8, file: 1 };
   // `clickAt` is a grid square (col, row; 1,1 at the bottom left) and the
@@ -310,13 +310,13 @@ try {
   const SLICE_CHECKS = [
     { row: 1, label: "Front View", prefix: "front", cells: 25, pieces: 25, field: "rank", cols: 5,
       clickAt: { col: 4, row: 3, cell: { level: 3, rank: 8, file: 4 } }, carriedAt: { col: 1, row: 2 },
-      expected: { view: "front-white", perspective: "white", ...CARRIED, show3dDiagonals: false } },
+      expected: { view: "front-white", perspective: "white", ...CARRIED, show3dDiagonals: true } },
     { row: 2, label: "Top View", prefix: "top", cells: 40, pieces: 20, field: "level", cols: 5,
       clickAt: { col: 2, row: 7, cell: { level: 2, rank: 7, file: 2 } }, carriedAt: { col: 1, row: 8 },
-      expected: { view: "top-view", perspective: "all", ...CARRIED, show3dDiagonals: false } },
+      expected: { view: "top-view", perspective: "all", ...CARRIED, show3dDiagonals: true } },
     { row: 3, label: "Side View", prefix: "side", cells: 40, pieces: 20, field: "file", cols: 8,
       clickAt: { col: 3, row: 4, cell: { level: 4, rank: 6, file: 1 } }, carriedAt: { col: 1, row: 2 },
-      expected: { view: "side-white", perspective: "white", ...CARRIED, show3dDiagonals: false } },
+      expected: { view: "side-white", perspective: "white", ...CARRIED, show3dDiagonals: true } },
   ];
   // The view titles currently shown, and where the shown one sits relative
   // to the top of its view's drawing (the slice grid, or the cube).
@@ -388,7 +388,7 @@ try {
         exitCode = 1;
       }
       await checkCell("front: black Triton at 2,8,1, carried", {
-        coords: "2, 8, 1", values: "2,8,1", empty: false, color: "BLACK", letter: "T #000000", name: "Triton", icon: true, diag: null,
+        coords: "2, 8, 1", values: "2,8,1", empty: false, color: "BLACK", letter: "T #000000", name: "Triton", icon: true, diag: "#b300b3",
       });
     }
     await checkState(`${prefix} after switching`, expected);
@@ -423,26 +423,29 @@ try {
       exitCode = 1;
     }
 
-    // Toggled back off afterwards so the state checks are unaffected.
+    // Diagonals carried in on, so the overlay is already shown; toggle it
+    // off and back on, leaving it on so the state checks are unaffected.
     const viewDiag = () => page.evaluate((prefix) => {
       const g = document.getElementById(`${prefix}-diag-squares`);
       const rects = [...g.querySelectorAll("rect")];
       return { display: g.getAttribute("display"), count: rects.length,
         colors: [...new Set(rects.map((r) => r.getAttribute("stroke")))] };
     }, prefix);
-    const diagOff = await viewDiag();
-    await diagButton.click();
     const diagOn = await viewDiag();
-    console.log(`${prefix} diag overlay: ${diagOff.display} -> ${diagOn.display}; ${diagOn.count} squares; colors ${diagOn.colors.join(" | ")}`);
-    if (diagOff.display !== "none" || diagOn.display !== "inline" || diagOn.count !== cells
-        || JSON.stringify([...diagOn.colors].sort()) !== JSON.stringify([...diagColors].sort())) {
-      console.error(`FAIL: diag toggle did not show ${label}'s diag squares in the cube's colors`);
-      exitCode = 1;
-    }
     if (prefix === "front") await checkCell("front, diagonals on", { diag: "#b300b3" });
     await page.screenshot({ path: path.join(outDir, `screenshot-${prefix}-diag-on.png`) });
     console.log(`screenshot: ${path.join(outDir, `screenshot-${prefix}-diag-on.png`)}`);
     await diagButton.click();
+    const diagOff = await viewDiag();
+    await diagButton.click();
+    const diagBack = await viewDiag();
+    console.log(`${prefix} diag overlay: ${diagOn.display} -> ${diagOff.display} -> ${diagBack.display}; ${diagOn.count} squares; colors ${diagOn.colors.join(" | ")}`);
+    if (diagOn.display !== "inline" || diagOff.display !== "none" || diagBack.display !== "inline"
+        || diagOn.count !== cells
+        || JSON.stringify([...diagOn.colors].sort()) !== JSON.stringify([...diagColors].sort())) {
+      console.error(`FAIL: ${label} should show its carried-over diag squares in the cube's colors, and the toggle should hide and re-show them`);
+      exitCode = 1;
+    }
 
     // Clicking a square selects its cell (all three fields) without moving
     // the plane shown; clicking the carried cell's square (a piece, so the
@@ -518,7 +521,7 @@ try {
     console.error("FAIL: re-selecting Cube View did not restore the cube");
     exitCode = 1;
   }
-  await checkState("cube after switching", { ...CUBE_INIT, ...CARRIED });
+  await checkState("cube after switching", { ...CUBE_INIT, ...CARRIED, show3dDiagonals: true });
   const cubeTitle = await shownTitles();
   console.log(`cube: titles shown ${JSON.stringify(cubeTitle.shown)}; title bottom ${cubeTitle.bottom?.toFixed(1)}, cube top ${cubeTitle.gridTop?.toFixed(1)}`);
   if (JSON.stringify(cubeTitle.shown) !== JSON.stringify(["Cube View"]) || !(cubeTitle.bottom <= cubeTitle.gridTop)) {
@@ -526,8 +529,8 @@ try {
     exitCode = 1;
   }
   const diagDisplayCube = await page.locator("#diag-squares").getAttribute("display");
-  if (diagDisplayCube !== "none") {
-    console.error("FAIL: diag overlay should be hidden after switching to cube-view");
+  if (diagDisplayCube !== "inline") {
+    console.error("FAIL: diag overlay should stay shown after switching to cube-view");
     exitCode = 1;
   }
 

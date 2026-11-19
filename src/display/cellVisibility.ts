@@ -13,12 +13,12 @@ export type CellClassifier = (location: Location) => CellDisplayMode;
 // A rule builds a classifier from a DisplayState snapshot.
 export type CellVisibilityRule = (state: DisplayState) => CellClassifier;
 
-// 'all-visible': every cell visible, nothing hidden or highlighted.
+// 'all': every cell visible, nothing hidden or highlighted.
 // Mainly a baseline/test case while real rules are developed.
 const allVisibleRule: CellVisibilityRule = () => () => 'visible';
 
 const CELL_VISIBILITY_RULES: Record<CellVisibilityOption, CellVisibilityRule> = {
-  'all-visible': allVisibleRule,
+  all: allVisibleRule,
 };
 
 // Factory: picks the rule named by state.cellVisibility.

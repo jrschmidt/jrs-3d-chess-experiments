@@ -84,19 +84,19 @@ CWD. It:
    icons are no larger than that (the cube shrinks only if it has to clear
    the cell display), that the cell display sits one front cell in from the
    page's top-right corner, clear of the cube and every widget, and that it
-   still shows the Triton at 2,8,1, plus its diag color once diagonals are
-   on. Confirms the cell picker cube still highlights 2/8/1 (the cell carries
-   over) and the diag toggle is OFF (the other fields reset to the view's
-   initial state; displayState isn't shown on the page, so the widgets are
-   the check). Screenshots `screenshot-<front|top|side>-view.png`. Each
+   still shows the Triton at 2,8,1 and its diag color (diagonals carry
+   over). Confirms the cell picker cube still highlights 2/8/1 and the diag
+   toggle is still ON (the cell and the diagonals carry over; the other
+   fields reset to the view's initial state; displayState isn't shown on the
+   page, so the widgets are the check). Screenshots `screenshot-<front|top|side>-view.png`. Each
    view shows the plane at its own field (Front: rank, Top: level, Side:
    file), so it then picks that field one step over and back, confirming
    the first square's checker color flips and returns and the piece count
    returns; in Front it also picks rank 3 (an empty rank), confirming no
-   pieces are drawn (screenshots `screenshot-front-rank3.png`). Then toggles
-   the diagonals on, confirming `#<front|top|side>-diag-squares` shows one
-   square per cell in the cube overlay's colors (screenshots
-   `screenshot-<view>-diag-on.png`), and off again. Then clicks one square
+   pieces are drawn (screenshots `screenshot-front-rank3.png`). Then confirms
+   `#<front|top|side>-diag-squares` is already shown, one square per cell
+   in the cube overlay's colors (screenshots `screenshot-<view>-diag-on.png`),
+   then toggles the diagonals off (hidden) and back on (shown). Then clicks one square
    in the view (Front 4,3 → cell 3,8,4; Top 2,7 → 2,7,2; Side 3,4 →
    4,6,1), confirming the cell picker cube and cell display show that cell,
    the plane and view are unchanged (screenshots
@@ -111,7 +111,7 @@ CWD. It:
    follows (screenshots `screenshot-<view>-plane-1.png`), then clicks the
    starting numeral to restore it. Finally clicks "Cube
    View" and confirms only `#cube` is shown, the cell is still 2,8,1, the
-   diagonals are off, and only `#cube-title` ("Cube View") is shown, above
+   diagonals are still on, and only `#cube-title` ("Cube View") is shown, above
    the cube.
    `#not-implemented` (front-black, side-black) can't be reached from the
    view widget, so it's only checked to be hidden.
