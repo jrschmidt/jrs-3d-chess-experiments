@@ -398,7 +398,7 @@ try {
   // icon drawn over it must let the click through to the square.
   const clickSquare = async (prefix, cols, col, row) => {
     const center = await page.evaluate(({ prefix, i }) => {
-      const r = document.querySelectorAll(`#${prefix}-checkers rect`)[i].getBoundingClientRect();
+      const r = document.querySelectorAll(`#${prefix}-checkers polygon`)[i].getBoundingClientRect();
       return { x: r.x + r.width / 2, y: r.y + r.height / 2 };
     }, { prefix, i: (row - 1) * cols + (col - 1) });
     await page.mouse.click(center.x, center.y);
@@ -431,7 +431,7 @@ try {
       exitCode = 1;
     }
     const counts = await page.evaluate((prefix) => ({
-      cells: document.querySelectorAll(`#${prefix}-checkers rect`).length,
+      cells: document.querySelectorAll(`#${prefix}-checkers polygon`).length,
       pieces: document.querySelectorAll(`#${prefix}-pieces > g`).length,
     }), prefix);
     const size = await iconSize(`#${prefix}-pieces > g`);
@@ -466,7 +466,7 @@ try {
     // the first square's fill must change; moving back restores it. In
     // Front, rank 3 is empty, so its pieces must be redrawn as none.
     const planeInfo = () => page.evaluate((prefix) => ({
-      fill: document.querySelector(`#${prefix}-checkers rect`).getAttribute("fill"),
+      fill: document.querySelector(`#${prefix}-checkers polygon`).getAttribute("fill"),
       pieces: document.querySelectorAll(`#${prefix}-pieces > g`).length,
     }), prefix);
     const start = expected[field];
@@ -493,7 +493,7 @@ try {
     // off and back on, leaving it on so the state checks are unaffected.
     const viewDiag = () => page.evaluate((prefix) => {
       const g = document.getElementById(`${prefix}-diag-squares`);
-      const rects = [...g.querySelectorAll("rect")];
+      const rects = [...g.querySelectorAll("polygon")];
       return { display: g.getAttribute("display"), count: rects.length,
         colors: [...new Set(rects.map((r) => r.getAttribute("stroke")))] };
     }, prefix);
@@ -599,6 +599,45 @@ try {
     console.log(`screenshot: ${path.join(outDir, `screenshot-${prefix}-plane-1.png`)}`);
     await page.locator(`${pickerSel} [data-value="${start}"]`).click();
     await checkState(`${prefix} after plane picker back to ${start}`, expected);
+
+    // In Iso view mode, Front's row lines tilt TILT_DEGREES (20) up to the
+    // right (counterclockwise) and Side's down to the right (clockwise),
+    // while column lines stay vertical; Top doesn't change. The title stays
+    // above the grid, the plane picker right of it, the pieces all drawn,
+    // and a click still selects. Basic puts the square grid back.
+    const gridShape = () => page.evaluate((prefix) => {
+      const pts = document.querySelector(`#${prefix}-checkers polygon`).getAttribute("points")
+        .split(" ").map((p) => p.split(",").map(Number));
+      const deg = ([x0, y0], [x1, y1]) => Math.atan2(y1 - y0, x1 - x0) * 180 / Math.PI;
+      const box = (id) => document.getElementById(id).getBoundingClientRect();
+      return {
+        rowLine: deg(pts[0], pts[1]), colLineDx: pts[3][0] - pts[0][0],
+        titleBottom: box(`${prefix}-subtitle`).bottom, gridTop: box(`${prefix}-checkers`).top,
+        gridRight: box(`${prefix}-checkers`).right, pickerLeft: box(`${prefix}-plane-picker`).left,
+        pieces: document.querySelectorAll(`#${prefix}-pieces > g`).length,
+      };
+    }, prefix);
+    const wantTilt = { front: -20, side: 20, top: 0 }[prefix];
+    await page.locator('#view-mode-picker [data-value="iso"]').click();
+    const iso = await gridShape();
+    console.log(`${prefix} iso: row line ${iso.rowLine.toFixed(2)} deg (want ${wantTilt}), column line dx ${iso.colLineDx.toFixed(2)}; subtitle bottom ${iso.titleBottom.toFixed(1)}, grid top ${iso.gridTop.toFixed(1)}; grid right ${iso.gridRight.toFixed(1)}, picker left ${iso.pickerLeft.toFixed(1)}; ${iso.pieces} pieces`);
+    if (Math.abs(iso.rowLine - wantTilt) > 0.01 || Math.abs(iso.colLineDx) > 0.01 || !(iso.titleBottom <= iso.gridTop)
+        || !(iso.gridRight < iso.pickerLeft) || iso.pieces !== pieces) {
+      console.error(`FAIL: ${label} in Iso should tilt its row lines ${wantTilt} deg with vertical column lines, title above and plane picker right of the grid, all ${pieces} pieces drawn`);
+      exitCode = 1;
+    }
+    await page.screenshot({ path: path.join(outDir, `screenshot-${prefix}-iso.png`) });
+    console.log(`screenshot: ${path.join(outDir, `screenshot-${prefix}-iso.png`)}`);
+    await clickSquare(prefix, cols, clickAt.col, clickAt.row);
+    await checkState(`${prefix} iso after clicking square ${clickAt.col},${clickAt.row}`, { ...expected, ...clickAt.cell });
+    await clickSquare(prefix, cols, carriedAt.col, carriedAt.row);
+    await checkState(`${prefix} iso after clicking the carried cell`, expected);
+    await page.locator('#view-mode-picker [data-value="basic"]').click();
+    const basic = await gridShape();
+    if (Math.abs(basic.rowLine) > 0.01 || Math.abs(basic.colLineDx) > 0.01) {
+      console.error(`FAIL: ${label} back in Basic should draw a square grid`);
+      exitCode = 1;
+    }
   }
 
   await viewRows.nth(0).click();

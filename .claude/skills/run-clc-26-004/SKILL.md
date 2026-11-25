@@ -123,7 +123,15 @@ CWD. It:
    (`[data-arrow]`) and numeral 1 (`[data-value]`), confirming the field
    follows and the subtitle updates (screenshots
    `screenshot-<view>-plane-1.png`), then clicks the
-   starting numeral to restore it. Finally clicks "Cube
+   starting numeral to restore it. Then picks Iso in the view mode picker
+   and checks the grid (`#<view>-checkers polygon` points): Front's row
+   lines tilt -20 degrees on screen (up to the right, counterclockwise),
+   Side's +20 (clockwise), Top's stay level, and column lines stay
+   vertical; the subtitle is still above the grid, the plane picker right
+   of it, and every piece drawn (screenshots `screenshot-<view>-iso.png`).
+   Clicks a square and the carried cell's square again to confirm clicks
+   still select in Iso, then picks Basic and confirms the grid is square
+   again. Finally clicks "Cube
    View" and confirms only `#cube` is shown, the cell is still 2,8,1, the
    diagonals are still on, and only `#cube-title` ("Cube View") is shown, above
    the cube.
@@ -164,6 +172,9 @@ cell display (front: black Triton at 2,8,1, carried): {"coords":"2, 8, 1",...,"n
 front after switching: widgets level 2, rank 8, file 1, diag OFF
 front plane (rank): fill #808080 -> #333333 -> #808080; pieces 25 -> 25 (rank 3: 0) -> 25
 front diag overlay: none -> inline; 25 squares; colors #b34100 | #178217 | #b300b3 | #1953ff
+front iso: row line -20.00 deg (want -20), column line dx 0.00; subtitle bottom 238.6, grid top 248.6; grid right 678.7, picker left 712.4; 25 pieces
+front iso after clicking square 4,3: widgets level 3, rank 8, file 4, diag ON
+front iso after clicking the carried cell: widgets level 2, rank 8, file 1, diag ON
 top: ... (40 cells, 20 pieces; level 2)
 side: ... (40 cells, 20 pieces; file 1)
 display after re-selecting cube: {"cube":"inline",...}

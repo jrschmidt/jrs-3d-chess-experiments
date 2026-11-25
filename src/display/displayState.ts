@@ -8,8 +8,8 @@ export type Perspective = 'all' | 'white' | 'black';
 export type LevelValue = null | 1 | 2 | 3 | 4 | 5;
 export type RankValue = null | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8;
 export type FileValue = null | 1 | 2 | 3 | 4 | 5;
-// How the views are drawn. Only 'basic' is implemented; 'iso' draws the
-// same as 'basic' for now, and 'isoX' isn't offered yet.
+// How the views are drawn. 'iso' tilts the Front and Side slice views (see
+// drawSlice.ts) and otherwise draws like 'basic'; 'isoX' isn't offered yet.
 export type ViewMode = 'basic' | 'iso' | 'isoX';
 // Which cell-visibility rule (see cellVisibility.ts) is in effect.
 export type CellVisibilityOption = 'all';
