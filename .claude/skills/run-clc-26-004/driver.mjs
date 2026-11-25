@@ -642,7 +642,12 @@ try {
     // subtitle above them and the plane picker right of them, left of the
     // separator. Clicking a square in another slice selects only that rank
     // (the cell's level and file stay), making its slice the large one;
-    // clicking a square in the large slice selects that cell.
+    // clicking a square in the large slice selects that cell. After the row
+    // (squares 200..224), the selected rank is also drawn flat: a square
+    // grid in the lower left corner, left-aligned with the row and below
+    // every slice it shares x with, with that rank's pieces (so the view
+    // draws the cube's pieces plus the selected rank's again); clicking it
+    // selects a cell.
     await page.locator('#view-mode-picker [data-value="isoX"]').click();
     const isoX = await gridShape();
     if (prefix !== "front") {
@@ -657,7 +662,7 @@ try {
         const pts = polys.map((p) => p.getAttribute("points").split(" ").map((q) => q.split(",").map(Number)));
         const deg = ([x0, y0], [x1, y1]) => Math.atan2(y1 - y0, x1 - x0) * 180 / Math.PI;
         const slices = [];
-        for (let i = 0; i < pts.length; i += 25) {
+        for (let i = 0; i < Math.min(pts.length, 200); i += 25) {
           const all = pts.slice(i, i + 25).flat();
           const xs = all.map((q) => q[0]), ys = all.map((q) => q[1]);
           slices.push({
@@ -668,8 +673,24 @@ try {
         }
         const box = (id) => document.getElementById(id).getBoundingClientRect();
         const ctm = document.getElementById("front-checkers").getScreenCTM();
+        // The flat slice, and the pieces drawn inside it and inside the large
+        // (row) slice, by their icons' translate.
+        const flatPts = pts.slice(200);
+        const fx = flatPts.flat().map((q) => q[0]), fy = flatPts.flat().map((q) => q[1]);
+        const flat = flatPts.length ? {
+          squares: flatPts.length,
+          minX: Math.min(...fx), maxX: Math.max(...fx), minY: Math.min(...fy), maxY: Math.max(...fy),
+          rowLine: deg(flatPts[0][0], flatPts[0][1]), colLineDx: flatPts[0][3][0] - flatPts[0][0][0],
+        } : null;
+        const iconAt = [...document.querySelectorAll("#front-pieces > g")].map((g) => {
+          const m = /translate\(([-\d.]+)[ ,]+([-\d.]+)\)/.exec(g.getAttribute("transform"));
+          return m ? { x: Number(m[1]), y: Number(m[2]) } : null;
+        }).filter(Boolean);
+        const inBox = (b) => iconAt.filter((q) => q.x > b.minX && q.x < b.maxX && q.y > b.minY && q.y < b.maxY).length;
         return {
-          squares: polys.length, slices,
+          squares: polys.length, slices, flat,
+          flatPieces: flat ? inBox(flat) : 0,
+          slicePieces: slices.map(inBox),
           pieces: document.querySelectorAll("#front-pieces > g").length,
           subtitleBottom: box("front-subtitle").bottom, checkersTop: box("front-checkers").top,
           checkersRight: box("front-checkers").right, pickerLeft: box("front-plane-picker").left,
@@ -691,10 +712,20 @@ try {
         const tilts = x.slices.every((sl) => Math.abs(sl.rowLine + 20) < 0.1 && Math.abs(sl.colLineDx) < 0.02);
         const equalOthers = others.every((w) => Math.abs(w - others[0]) < 0.5);
         console.log(`front iso-x (${name}): ${x.squares} squares in ${x.slices.length} slices; widths ${widths.map((w) => w.toFixed(1)).join(" ")} (selected/other ${ratio.toFixed(3)}); separate ${ordered}; axis ${axisDeg.toFixed(2)} deg; slice tilts ok ${tilts}; ${x.pieces} pieces (cube ${totalPieces}); subtitle bottom ${x.subtitleBottom.toFixed(1)} vs top ${x.checkersTop.toFixed(1)}; slices right ${x.checkersRight.toFixed(1)}, picker ${x.pickerLeft.toFixed(1)}..${x.pickerRight.toFixed(1)}, separator ${x.sepX.toFixed(1)}`);
-        if (x.squares !== 200 || x.slices.length !== 8 || Math.abs(ratio - 1.7) > 0.02 || !equalOthers || !ordered
-            || Math.abs(axisDeg - 20) > 1 || !tilts || x.pieces !== totalPieces || !(x.subtitleBottom <= x.checkersTop)
+        const rankPieces = x.slicePieces[selIdx];
+        if (x.squares !== 225 || x.slices.length !== 8 || Math.abs(ratio - 1.7) > 0.02 || !equalOthers || !ordered
+            || Math.abs(axisDeg - 20) > 1 || !tilts || x.pieces !== totalPieces + rankPieces || !(x.subtitleBottom <= x.checkersTop)
             || !(x.checkersRight < x.pickerLeft) || !(x.pickerRight < x.sepX)) {
           console.error(`FAIL: Front View in Iso-X (${name}) should show 8 separate Iso rank slices, rank 8 first, along a +20 degree axis, rank ${selectedRank}'s 1.7x the others, all pieces, subtitle above, plane picker between the slices and the separator`);
+          exitCode = 1;
+        }
+        const f = x.flat;
+        const fw = f.maxX - f.minX, fh = f.maxY - f.minY;
+        const clear = x.slices.every((sl) => sl.minX >= f.maxX || sl.maxY < f.minY);
+        console.log(`front iso-x (${name}) flat slice: ${f.squares} squares; ${fw.toFixed(1)} x ${fh.toFixed(1)}; row line ${f.rowLine.toFixed(2)} deg, column dx ${f.colLineDx.toFixed(2)}; left ${f.minX.toFixed(1)} (row ${x.slices[0].minX.toFixed(1)}); below the row ${clear}; ${x.flatPieces} pieces (rank ${selectedRank}'s slice ${rankPieces})`);
+        if (f.squares !== 25 || Math.abs(fw - fh) > 0.5 || Math.abs(f.rowLine) > 0.01 || Math.abs(f.colLineDx) > 0.01
+            || Math.abs(f.minX - x.slices[0].minX) > 0.5 || !clear || x.flatPieces !== rankPieces) {
+          console.error(`FAIL: Front View in Iso-X (${name}) should also draw rank ${selectedRank} flat (a square grid) in the lower left, below the row, with its pieces`);
           exitCode = 1;
         }
       };
@@ -715,6 +746,15 @@ try {
       await checkExploded(5, "rank 5 selected");
       await clickMiddle(3);
       await checkState("front iso-x after clicking rank 5's (large) slice", { ...expected, level: 3, rank: 5, file: 3 });
+      // Clicking flat square (4, 2) selects file 4, level 2 of rank 5.
+      {
+        const target = await page.evaluate(() => {
+          const r = document.querySelectorAll("#front-checkers polygon")[200 + 5 + 3].getBoundingClientRect();
+          return { x: r.x + r.width / 2, y: r.y + r.height / 2 };
+        });
+        await page.mouse.click(target.x, target.y);
+      }
+      await checkState("front iso-x after clicking the flat slice's square 4,2", { ...expected, level: 2, rank: 5, file: 4 });
       await page.screenshot({ path: path.join(outDir, "screenshot-front-isox-rank5.png") });
       console.log(`screenshot: ${path.join(outDir, "screenshot-front-isox-rank5.png")}`);
       await page.locator('#front-plane-picker [data-value="8"]').click();

@@ -36,7 +36,10 @@ import {
 // EXPLODE_SELECTED_SCALE times the size of the others, which shrink so the
 // whole set fits left of the plane picker. Clicking a square in the
 // selected slice selects its cell; in any other slice it selects only that
-// slice's plane. Otherwise Iso-X draws like Iso.
+// slice's plane. The selected plane is also drawn flat (as in Basic) in
+// the lower left corner, below the row, as large as fits there up to its
+// Basic size; it shows pieces and selects cells like the selected slice.
+// Otherwise Iso-X draws like Iso.
 const TILT_RAD = TILT_DEGREES * Math.PI / 180;
 const EXPLODE_SELECTED_SCALE = 1.7;
 const EXPLODE_GAP = PITCH * 0.15;
@@ -119,17 +122,21 @@ const buildSliceView = (config, bbox, state) => {
   // the selected plane (the large slice) does.
   const layoutKey = (mode, p) => exploded(mode) ? `${mode}|${p}` : mode;
 
-  // The grid's unscaled steps for the current view mode (see layout). A
-  // placed slice is { plane, center, scale }; its plane is null when it
-  // shows whatever plane is selected (the single-slice layouts). gridPoint
+  // The grid's unscaled steps for the current view mode (see layout), and
+  // for a flat slice. A placed slice is { plane, center, scale, flat? };
+  // its plane is null when it shows whatever plane is selected (the
+  // single-slice layouts), and a flat one is drawn with Basic's steps in
+  // any mode. gridPoint
   // is the screen point at grid position (col, row) of a slice: square
   // (col, row) is centered on whole numbers, its corners on the halves.
   let steps = gridSteps(config, state.viewMode);
+  const flatSteps = gridSteps(config, "basic");
   const gridPoint = (slice, col, row) => {
+    const st = slice.flat ? flatSteps : steps;
     const c = (col - (config.cols + 1) / 2) * slice.scale, r = (row - (config.rows + 1) / 2) * slice.scale;
     return {
-      x: slice.center.x + c * steps.col.x + r * steps.row.x,
-      y: slice.center.y + c * steps.col.y + r * steps.row.y,
+      x: slice.center.x + c * st.col.x + r * st.row.x,
+      y: slice.center.y + c * st.col.y + r * st.row.y,
     };
   };
   const squareCorners = (slice, col, row, k = 1) => [[-1, -1], [1, -1], [1, 1], [-1, 1]]
@@ -180,7 +187,9 @@ const buildSliceView = (config, bbox, state) => {
   // The slices to draw for `mode` with plane `selected` selected. Exploded:
   // planes planeMax..1 left to right along the axis, sized and packed so
   // they exactly fill the width from the bbox's left edge to a gap left of
-  // the plane picker (moved to the bbox's right edge), centered vertically.
+  // the plane picker (moved to the bbox's right edge), centered vertically;
+  // then the selected plane flat in the bbox's lower left corner (see
+  // flatSlice).
   const placedSlices = (mode, selected) => {
     if (!exploded(mode)) return [{ plane: null, center, scale: 1 }];
     const { axis } = config.isoXExplode;
@@ -202,7 +211,30 @@ const buildSliceView = (config, bbox, state) => {
     const minX = Math.min(...pts.map((q) => q.x));
     const minY = Math.min(...pts.map((q) => q.y)), maxY = Math.max(...pts.map((q) => q.y));
     const dx = availMinX - minX, dy = center.y - (minY + maxY) / 2;
-    return slices.map((sl) => ({ ...sl, center: { x: sl.center.x + dx, y: sl.center.y + dy } }));
+    const row = slices.map((sl) => ({ ...sl, center: { x: sl.center.x + dx, y: sl.center.y + dy } }));
+    return [...row, flatSlice(row, selected)];
+  };
+
+  // The selected plane, flat, with its bottom left corner at the bbox's:
+  // the largest scale, up to 1 (its Basic size), that keeps it at least
+  // EXPLODE_GAP below every slice of `row` it shares any x with (found by
+  // bisection, against the slices' bounding boxes).
+  const flatSlice = (row, selected) => {
+    const boxes = row.map((sl) => {
+      const pts = outerCorners(sl);
+      const xs = pts.map((q) => q.x), ys = pts.map((q) => q.y);
+      return { minX: Math.min(...xs), maxX: Math.max(...xs), maxY: Math.max(...ys) };
+    });
+    const fits = (scale) => {
+      const w = config.cols * PITCH * scale, h = config.rows * PITCH * scale;
+      const top = bbox.maxY - h;
+      return boxes.every((b) => b.minX >= bbox.minX + w || b.maxY + EXPLODE_GAP <= top);
+    };
+    let lo = 0, hi = 1;
+    if (fits(hi)) lo = hi;
+    else for (let i = 0; i < 30; i++) { const mid = (lo + hi) / 2; if (fits(mid)) lo = mid; else hi = mid; }
+    const w = config.cols * PITCH * lo, h = config.rows * PITCH * lo;
+    return { plane: selected, flat: true, center: { x: bbox.minX + w / 2, y: bbox.maxY - h / 2 }, scale: lo };
   };
 
   // Rebuilds the squares and frames for `mode` with plane `selected`, and

@@ -135,11 +135,16 @@ CWD. It:
    first), separate, left to right along a +20 degree axis, each an Iso
    slice, the selected rank's 1.7x as wide as the others, with every piece
    on the board; subtitle above them, plane picker right of them and left of
-   the separator (screenshot `screenshot-front-isox.png`). It clicks the
+   the separator (screenshot `screenshot-front-isox.png`). The selected
+   rank must also be drawn flat after the row (squares 200..224): a square,
+   untilted grid left-aligned with the row, below every slice it shares x
+   with, holding the same pieces as the large slice (so the view draws the
+   cube's pieces plus that rank's). It clicks the
    middle square of rank 5's (small) slice and confirms only the rank
    changed (2,5,1) and rank 5's slice is now the large one, then clicks the
    same square again (now in the large slice) and confirms 3,5,3 is
-   selected (`screenshot-front-isox-rank5.png`), then
+   selected, then clicks flat square 4,2 and confirms 2,5,4 is selected
+   (`screenshot-front-isox-rank5.png`), then
    restores rank 8 and the carried cell. Then picks Basic and confirms the grid is square
    again. Finally clicks "Cube
    View" and confirms only `#cube` is shown, the cell is still 2,8,1, the
@@ -185,10 +190,12 @@ front diag overlay: none -> inline; 25 squares; colors #b34100 | #178217 | #b300
 front iso: row line -20.00 deg (want -20), column line dx 0.00; subtitle bottom 238.6, grid top 248.6; grid right 678.7, picker left 712.4; 25 pieces
 front iso after clicking square 4,3: widgets level 3, rank 8, file 4, diag ON
 front iso after clicking the carried cell: widgets level 2, rank 8, file 1, diag ON
-front iso-x (rank 8 selected): 200 squares in 8 slices; widths 137.7 81.0 81.0 81.0 81.0 81.0 81.0 81.0 (selected/other 1.700); separate true; axis 20.00 deg; slice tilts ok true; 100 pieces (cube 100); subtitle bottom 276.2 vs top 286.2; slices right 877.7, picker 900.2..959.8, separator 982.8
+front iso-x (rank 8 selected): 225 squares in 8 slices; widths 137.7 81.0 81.0 81.0 81.0 81.0 81.0 81.0 (selected/other 1.700); separate true; axis 20.00 deg; slice tilts ok true; 125 pieces (cube 100); subtitle bottom 276.2 vs top 286.2; slices right 877.7, picker 900.2..959.8, separator 982.8
+front iso-x (rank 8 selected) flat slice: 25 squares; 286.9 x 286.9; row line 0.00 deg, column dx 0.00; left -526.2 (row -526.2); below the row true; 25 pieces (rank 8's slice 25)
 front iso-x after clicking rank 5's (small) slice: widgets level 2, rank 5, file 1, diag ON
-front iso-x (rank 5 selected): 200 squares in 8 slices; widths 81.0 81.0 81.0 137.6 81.0 81.0 81.0 81.0 (selected/other 1.700); ...
+front iso-x (rank 5 selected): 225 squares in 8 slices; widths 81.0 81.0 81.0 137.6 81.0 81.0 81.0 81.0 (selected/other 1.700); ...
 front iso-x after clicking rank 5's (large) slice: widgets level 3, rank 5, file 3, diag ON
+front iso-x after clicking the flat slice's square 4,2: widgets level 2, rank 5, file 4, diag ON
 front back in iso, carried cell restored: widgets level 2, rank 8, file 1, diag ON
 top: ... (40 cells, 20 pieces; level 2)
 side: ... (40 cells, 20 pieces; file 1)
