@@ -26,6 +26,25 @@ export const buildViewTitle = (text, x, topY, id) => {
   return el;
 };
 
+// The height of a view's subtitle line (text plus gap): a view with a
+// subtitle passes topY - VIEW_SUBTITLE_LINE to buildViewTitle, lifting the
+// title above it.
+export const VIEW_SUBTITLE_LINE = PITCH * 0.4;
+
+// A view's subtitle ("Rank 1", ...), a little smaller than the title and
+// where the title would be without one: centered on x with its baseline a
+// little above topY.
+export const buildViewSubtitle = (text, x, topY, id) => {
+  const el = svgEl("text", {
+    id, x, y: topY - PITCH * 0.2,
+    "text-anchor": "middle",
+    "font-size": PITCH * 0.32,
+    ...TEXT_STYLE,
+  });
+  el.textContent = text;
+  return el;
+};
+
 export const makePanelRect = (x0, y0, w, h) =>
   svgEl("rect", {
     x: x0, y: y0, width: w, height: h, rx: 6, ry: 6,

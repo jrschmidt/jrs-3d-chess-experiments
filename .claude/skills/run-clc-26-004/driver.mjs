@@ -471,6 +471,23 @@ try {
       exitCode = 1;
     }
 
+    // Under the title, the subtitle names the plane shown ("Rank 1", ...),
+    // above the grid, and follows the plane picker (checked below).
+    const planeName = field[0].toUpperCase() + field.slice(1);
+    const subtitleInfo = () => page.evaluate(({ prefix }) => {
+      const el = document.getElementById(`${prefix}-subtitle`);
+      const r = el.getBoundingClientRect();
+      return { text: el.textContent, top: r.top, bottom: r.bottom,
+        titleBottom: document.getElementById(`${prefix}-title`).getBoundingClientRect().bottom,
+        gridTop: document.getElementById(`${prefix}-checkers`).getBoundingClientRect().top };
+    }, { prefix });
+    const sub = await subtitleInfo();
+    console.log(`${prefix} subtitle: ${JSON.stringify(sub)}`);
+    if (sub.text !== `${planeName} ${start}` || !(sub.top >= sub.titleBottom - 1) || !(sub.bottom <= sub.gridTop)) {
+      console.error(`FAIL: ${label} subtitle should read "${planeName} ${start}", between its title and grid`);
+      exitCode = 1;
+    }
+
     // The plane picker (right of the grid) shows the view's field max..1
     // and highlights the current one; its up arrow moves the plane one up
     // (or, at the top, does nothing), and clicking a numeral jumps to it.
@@ -506,6 +523,10 @@ try {
     await checkState(`${prefix} after plane picker numeral 1`, { ...expected, [field]: 1 });
     if ((await pickerInfo()).selected !== "1") {
       console.error(`FAIL: ${label} plane picker should highlight 1 after clicking it`);
+      exitCode = 1;
+    }
+    if ((await subtitleInfo()).text !== `${planeName} 1`) {
+      console.error(`FAIL: ${label} subtitle should read "${planeName} 1" after picking plane 1`);
       exitCode = 1;
     }
     await page.screenshot({ path: path.join(outDir, `screenshot-${prefix}-plane-1.png`) });

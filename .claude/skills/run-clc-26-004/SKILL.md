@@ -103,12 +103,15 @@ CWD. It:
    `screenshot-<view>-clicked.png`), and clicks the 2,8,1 square (under a
    piece icon, so the click must pass through it) to put the cell back.
    Confirms the view's title (`#<front|top|side>-title`, "Front View" etc.)
-   is the only title shown and sits above the grid. Then checks the plane
+   is the only title shown and sits above the grid, and that the subtitle
+   under it (`#<view>-subtitle`, "Rank 1" / "Level 5" / "File 1") names the
+   plane shown and sits between title and grid. Then checks the plane
    picker right of the grid (`#<view>-plane-picker`): numerals max..1 top
    to bottom with the current plane highlighted and a caption (RANK / LEVEL
    / FILE) rotated 90 degrees; clicks its up arrow, down arrow
    (`[data-arrow]`) and numeral 1 (`[data-value]`), confirming the field
-   follows (screenshots `screenshot-<view>-plane-1.png`), then clicks the
+   follows and the subtitle updates (screenshots
+   `screenshot-<view>-plane-1.png`), then clicks the
    starting numeral to restore it. Finally clicks "Cube
    View" and confirms only `#cube` is shown, the cell is still 2,8,1, the
    diagonals are still on, and only `#cube-title` ("Cube View") is shown, above

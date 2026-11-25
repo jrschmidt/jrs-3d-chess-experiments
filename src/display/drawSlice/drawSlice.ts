@@ -8,7 +8,9 @@ import {
   isDarkCell, DIAG_COLORS, diagForCell, DIAG_SQUARE_MARGIN, DIAG_SQUARE_STROKE_WIDTH,
 } from '../render/cellColors.ts';
 import { buildPlanePicker } from '../widgets/planePicker.ts';
-import { buildViewTitle, emitDisplayChange } from '../widgets/widgetChrome.ts';
+import {
+  buildViewTitle, buildViewSubtitle, VIEW_SUBTITLE_LINE, emitDisplayChange,
+} from '../widgets/widgetChrome.ts';
 
 // Slice views: one slice of the cube seen straight on, as a flat cols x rows
 // grid of PITCH-sized squares, column 1 at the left and row 1 at the bottom.
@@ -18,13 +20,14 @@ import { buildViewTitle, emitDisplayChange } from '../widgets/widgetChrome.ts';
 // field is null), and maps a grid square (col, row) of that plane to its
 // cell; `rowsAreLevels` says whether the rows are levels (front, side) or
 // ranks (top), which decides how the frame shows the focus level. `title`
-// is drawn above the grid; `planeField` (with its caption and maximum) is
-// the field the view's plane picker changes.
+// is drawn above the grid, with "`planeName` {plane}" under it;
+// `planeField` (with its caption and maximum) is the field the view's plane
+// picker changes.
 const SLICE_VIEWS = {
   // The focus rank, seen from in front of it (white's side).
   "front-white": {
     id: "front-view", prefix: "front", cols: FILE_MAX, rows: LEVEL_MAX, rowsAreLevels: true,
-    title: "Front View", planeField: "rank", planeLabel: "RANK", planeMax: RANK_MAX,
+    title: "Front View", planeName: "Rank", planeField: "rank", planeLabel: "RANK", planeMax: RANK_MAX,
     plane: (state) => state.rank ?? 1,
     cellAt: (col, row, rank) => ({ rank, level: row, file: col }),
   },
@@ -32,7 +35,7 @@ const SLICE_VIEWS = {
   // and rank 1 at the right, as on the cube's visible file-1 face.
   "side-white": {
     id: "side-view", prefix: "side", cols: RANK_MAX, rows: LEVEL_MAX, rowsAreLevels: true,
-    title: "Side View", planeField: "file", planeLabel: "FILE", planeMax: FILE_MAX,
+    title: "Side View", planeName: "File", planeField: "file", planeLabel: "FILE", planeMax: FILE_MAX,
     plane: (state) => state.file ?? 1,
     cellAt: (col, row, file) => ({ rank: RANK_MAX + 1 - col, level: row, file }),
   },
@@ -40,7 +43,7 @@ const SLICE_VIEWS = {
   // at the left.
   "top-view": {
     id: "top-view", prefix: "top", cols: FILE_MAX, rows: RANK_MAX, rowsAreLevels: false,
-    title: "Top View", planeField: "level", planeLabel: "LEVEL", planeMax: LEVEL_MAX,
+    title: "Top View", planeName: "Level", planeField: "level", planeLabel: "LEVEL", planeMax: LEVEL_MAX,
     plane: (state) => state.level ?? LEVEL_MAX,
     cellAt: (col, row, level) => ({ rank: row, level, file: col }),
   },
@@ -153,7 +156,12 @@ const buildSliceView = (config, bbox, state) => {
   const piecesEl = svgEl("g", { id: `${config.prefix}-pieces`, "pointer-events": "none" });
   el.appendChild(piecesEl);
 
-  el.appendChild(buildViewTitle(config.title, center.x, rowBoundaryY(config.rows), `${config.prefix}-title`));
+  // The title, with the plane shown under it.
+  const gridTop = rowBoundaryY(config.rows);
+  el.appendChild(buildViewTitle(config.title, center.x, gridTop - VIEW_SUBTITLE_LINE, `${config.prefix}-title`));
+  const subtitleText = () => `${config.planeName} ${plane}`;
+  const subtitleEl = buildViewSubtitle(subtitleText(), center.x, gridTop, `${config.prefix}-subtitle`);
+  el.appendChild(subtitleEl);
 
   // The plane picker, a gap right of the grid, centered on it.
   const planePicker = buildPlanePicker(right + PITCH * 0.3, center.y, {
@@ -167,6 +175,7 @@ const buildSliceView = (config, bbox, state) => {
   // picks, and highlights the focus level's boundary lines.
   const refresh = (state) => {
     plane = config.plane(state);
+    subtitleEl.textContent = subtitleText();
     planePicker.setValue(plane);
     for (const { el: line, boundaryIndex } of frameLines) {
       line.setAttribute("stroke", perimeterStroke(boundaryIndex, state.level));
