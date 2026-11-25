@@ -135,7 +135,16 @@ CWD. It:
    first), separate, left to right along a +20 degree axis, each an Iso
    slice, the selected rank's 1.7x as wide as the others, with every piece
    on the board; subtitle above them, plane picker right of them and left of
-   the separator (screenshot `screenshot-front-isox.png`). It clicks the
+   the separator (screenshot `screenshot-front-isox.png`). It hovers the
+   middle of rank 7's (small) slice and confirms it pops out into
+   `#front-hover` (drawn last): 25 squares, 1.7x its unhovered width around
+   the same center, with its pieces, while the other 175 squares, the
+   subtitle, the plane picker and the display state stay put
+   (`screenshot-front-isox-hover.png`); hovers rank 1's slice (right end)
+   and confirms it pops out 1.7x but stays left of the plane picker; then
+   moves the mouse off the slices and confirms the unhovered layout is
+   back. (After each slice click the driver moves the mouse off the
+   slices, so a hover can't skew the checks.) It clicks the
    middle square of rank 5's (small) slice and confirms only the rank
    changed (2,5,1) and rank 5's slice is now the large one, then clicks the
    same square again (now in the large slice) and confirms 3,5,3 is
@@ -186,6 +195,10 @@ front iso: row line -20.00 deg (want -20), column line dx 0.00; subtitle bottom 
 front iso after clicking square 4,3: widgets level 3, rank 8, file 4, diag ON
 front iso after clicking the carried cell: widgets level 2, rank 8, file 1, diag ON
 front iso-x (rank 8 selected): 200 squares in 8 slices; widths 137.7 81.0 81.0 81.0 81.0 81.0 81.0 81.0 (selected/other 1.700); separate true; axis 20.00 deg; slice tilts ok true; 100 pieces (cube 100); subtitle bottom 276.2 vs top 286.2; slices right 877.7, picker 900.2..959.8, separator 982.8
+front iso-x hovering rank 7: 175 base + 25 popped-out squares; width ratio 1.700; center moved 0.00,-0.00; others fixed true; 25 popped-out pieces; drawn last front-hover; subtitle/picker fixed true
+front iso-x while hovering rank 7: widgets level 2, rank 8, file 1, diag ON
+front iso-x hovering rank 1: width ratio 1.700; right edge 251.7 vs picker 272.7
+front iso-x after the hover: 200 base + 0 popped-out squares; layout restored true
 front iso-x after clicking rank 5's (small) slice: widgets level 2, rank 5, file 1, diag ON
 front iso-x (rank 5 selected): 200 squares in 8 slices; widths 81.0 81.0 81.0 137.6 81.0 81.0 81.0 81.0 (selected/other 1.700); ...
 front iso-x after clicking rank 5's (large) slice: widgets level 3, rank 5, file 3, diag ON

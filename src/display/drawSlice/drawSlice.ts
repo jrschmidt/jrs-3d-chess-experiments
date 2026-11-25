@@ -36,7 +36,10 @@ import {
 // EXPLODE_SELECTED_SCALE times the size of the others, which shrink so the
 // whole set fits left of the plane picker. Clicking a square in the
 // selected slice selects its cell; in any other slice it selects only that
-// slice's plane. Otherwise Iso-X draws like Iso.
+// slice's plane. While the cursor is over one of the small slices, that
+// slice pops out: it grows to the selected slice's size around its own
+// center (nudged inward at the ends of the row) and is drawn on top of its
+// neighbors; nothing else moves. Otherwise Iso-X draws like Iso.
 const TILT_RAD = TILT_DEGREES * Math.PI / 180;
 const EXPLODE_SELECTED_SCALE = 1.7;
 const EXPLODE_GAP = PITCH * 0.15;
@@ -113,11 +116,19 @@ const buildSliceView = (config, bbox, state) => {
   // laid out for, as of the last refresh.
   let plane = config.plane(state);
   let laidOutFor = null;
+  // The plane of the slice under the cursor (exploded views only; view-local
+  // UI state, not display state), and the state of the last refresh, which
+  // a hover change redraws with.
+  let hovered = null;
+  let lastState = state;
 
   const exploded = (mode) => mode === "isoX" && Boolean(config.isoXExplode);
+  // The slice that pops out: the hovered one, unless it's already large.
+  const effectiveHover = (mode, selected) =>
+    exploded(mode) && hovered !== selected ? hovered : null;
   // The slices only move when the view mode changes, or, exploded, when
-  // the selected plane (the large slice) does.
-  const layoutKey = (mode, p) => exploded(mode) ? `${mode}|${p}` : mode;
+  // the selected plane (the large slice) or the hovered slice does.
+  const layoutKey = (mode, p) => exploded(mode) ? `${mode}|${p}|${effectiveHover(mode, p)}` : mode;
 
   // The grid's unscaled steps for the current view mode (see layout). A
   // placed slice is { plane, center, scale }; its plane is null when it
@@ -142,22 +153,33 @@ const buildSliceView = (config, bbox, state) => {
   const planeOf = (slice) => slice.plane ?? plane;
 
   // Each square's checker and diag square (inset as in the cube), the
-  // frames and the pieces, filled in by layout and refresh. Only the
+  // frames and the pieces, filled in by layout and refresh, in two layers:
+  // the base layer holds every slice but a popped-out one, and the hover
+  // layer, drawn over everything else, holds only that one. Only the
   // checkers take clicks; the diag squares, frames and pieces drawn over
   // them pass clicks through.
-  const checkerGroup = svgEl("g", { id: `${config.prefix}-checkers` });
-  const diagGroup = svgEl("g", {
-    id: `${config.prefix}-diag-squares`, display: state.show3dDiagonals ? "inline" : "none",
-    "pointer-events": "none",
-  });
-  const frameGroup = svgEl("g", { id: `${config.prefix}-frame`, "pointer-events": "none" });
-  const piecesEl = svgEl("g", { id: `${config.prefix}-pieces`, "pointer-events": "none" });
-  el.appendChild(checkerGroup);
-  el.appendChild(diagGroup);
-  el.appendChild(frameGroup);
-  el.appendChild(piecesEl);
+  const buildLayer = (parent, idPrefix) => {
+    const layer = {
+      checkers: svgEl("g", { id: `${idPrefix}-checkers` }),
+      diag: svgEl("g", {
+        id: `${idPrefix}-diag-squares`, display: state.show3dDiagonals ? "inline" : "none",
+        "pointer-events": "none",
+      }),
+      frame: svgEl("g", { id: `${idPrefix}-frame`, "pointer-events": "none" }),
+      pieces: svgEl("g", { id: `${idPrefix}-pieces`, "pointer-events": "none" }),
+    };
+    for (const g of [layer.checkers, layer.diag, layer.frame, layer.pieces]) parent.appendChild(g);
+    return layer;
+  };
+  const baseLayer = buildLayer(el, config.prefix);
+  const hoverGroup = svgEl("g", { id: `${config.prefix}-hover` });
+  const hoverLayer = buildLayer(hoverGroup, `${config.prefix}-hover`);
+  const layers = [baseLayer, hoverLayer];
   let squares = [];
   let frameLines = [];
+  // Each exploded slice's checkers, to the plane of their slice (see the
+  // hover tracking below).
+  let checkerPlane = new WeakMap();
 
   // The title, with the plane shown under it; placed by layout.
   const subtitleText = () => `${config.planeName} ${plane}`;
@@ -175,14 +197,19 @@ const buildSliceView = (config, bbox, state) => {
     initial: plane,
   });
   el.appendChild(planePicker.el);
+  el.appendChild(hoverGroup);
   const pickerGap = PITCH * 0.3;
 
-  // The slices to draw for `mode` with plane `selected` selected. Exploded:
-  // planes planeMax..1 left to right along the axis, sized and packed so
-  // they exactly fill the width from the bbox's left edge to a gap left of
-  // the plane picker (moved to the bbox's right edge), centered vertically.
-  const placedSlices = (mode, selected) => {
-    if (!exploded(mode)) return [{ plane: null, center, scale: 1 }];
+  // The slices to draw for `mode` with plane `selected` selected and plane
+  // `hover` popped out (or null): { slices, hoverSlice }. Exploded: planes
+  // planeMax..1 left to right along the axis, sized and packed so they
+  // exactly fill the width from the bbox's left edge to a gap left of the
+  // plane picker (moved to the bbox's right edge), centered vertically.
+  // `slices` is that packing, the hovered slice at its unhovered size;
+  // hoverSlice is the hovered slice popped out: scaled up around its center,
+  // shifted just enough to stay inside that width.
+  const placedSlices = (mode, selected, hover) => {
+    if (!exploded(mode)) return { slices: [{ plane: null, center, scale: 1 }], hoverSlice: null };
     const { axis } = config.isoXExplode;
     const planes = Array.from({ length: config.planeMax }, (_, i) => config.planeMax - i);
     const availMinX = bbox.minX;
@@ -202,24 +229,38 @@ const buildSliceView = (config, bbox, state) => {
     const minX = Math.min(...pts.map((q) => q.x));
     const minY = Math.min(...pts.map((q) => q.y)), maxY = Math.max(...pts.map((q) => q.y));
     const dx = availMinX - minX, dy = center.y - (minY + maxY) / 2;
-    return slices.map((sl) => ({ ...sl, center: { x: sl.center.x + dx, y: sl.center.y + dy } }));
+    const placed = slices.map((sl) => ({ ...sl, center: { x: sl.center.x + dx, y: sl.center.y + dy } }));
+    const base = placed.find((sl) => sl.plane === hover);
+    if (!base) return { slices: placed, hoverSlice: null };
+    const grown = { ...base, scale: base.scale * EXPLODE_SELECTED_SCALE };
+    const xs = outerCorners(grown).map((q) => q.x);
+    const shift = Math.max(0, availMinX - Math.min(...xs)) - Math.max(0, Math.max(...xs) - availMaxX);
+    return { slices: placed, hoverSlice: { ...grown, center: { x: grown.center.x + shift, y: grown.center.y } } };
   };
 
-  // Rebuilds the squares and frames for `mode` with plane `selected`, and
-  // places the title above them and the plane picker right of them.
+  // Rebuilds the squares and frames for `mode` with plane `selected` (and
+  // the hovered slice popped out), and places the title above them and the
+  // plane picker right of them.
   const layout = (mode, selected) => {
     laidOutFor = layoutKey(mode, selected);
     steps = gridSteps(config, mode);
-    const slices = placedSlices(mode, selected);
-    checkerGroup.replaceChildren();
-    diagGroup.replaceChildren();
-    frameGroup.replaceChildren();
+    const { slices, hoverSlice } = placedSlices(mode, selected, effectiveHover(mode, selected));
+    for (const layer of layers) {
+      layer.checkers.replaceChildren();
+      layer.diag.replaceChildren();
+      layer.frame.replaceChildren();
+    }
     squares = [];
     frameLines = [];
-    const line = (a, b, attrs) => frameGroup.appendChild(svgEl("line", {
-      x1: a.x, y1: a.y, x2: b.x, y2: b.y, ...attrs,
-    }));
-    for (const slice of slices) {
+    checkerPlane = new WeakMap();
+    const drawn = [
+      ...slices.filter((sl) => !hoverSlice || sl.plane !== hoverSlice.plane).map((sl) => [sl, baseLayer]),
+      ...(hoverSlice ? [[hoverSlice, hoverLayer]] : []),
+    ];
+    for (const [slice, layer] of drawn) {
+      const line = (a, b, attrs) => layer.frame.appendChild(svgEl("line", {
+        x1: a.x, y1: a.y, x2: b.x, y2: b.y, ...attrs,
+      }));
       forEachSliceSquare(config, (col, row) => {
         const checkerEl = svgEl("polygon", {
           points: pointsAttr(squareCorners(slice, col, row)),
@@ -240,14 +281,15 @@ const buildSliceView = (config, bbox, state) => {
           emitDisplayChange(el, "rank", rank);
           emitDisplayChange(el, "file", file);
         });
-        checkerGroup.appendChild(checkerEl);
+        layer.checkers.appendChild(checkerEl);
+        if (slice.plane !== null) checkerPlane.set(checkerEl, slice.plane);
         const diagEl = svgEl("polygon", {
           points: pointsAttr(squareCorners(slice, col, row, DIAG_INSET)),
           fill: "none",
           "stroke-width": Math.max(1, DIAG_SQUARE_STROKE_WIDTH * slice.scale),
         });
-        diagGroup.appendChild(diagEl);
-        squares.push({ slice, col, row, checkerEl, diagEl });
+        layer.diag.appendChild(diagEl);
+        squares.push({ slice, col, row, checkerEl, diagEl, piecesEl: layer.pieces });
       });
 
       // The frame. With rows as levels: the two side edges, then one line
@@ -268,7 +310,7 @@ const buildSliceView = (config, bbox, state) => {
           frameLines.push({ el: lineEl, boundaryIndex });
         }
       } else {
-        frameGroup.appendChild(svgEl("polygon", {
+        layer.frame.appendChild(svgEl("polygon", {
           points: pointsAttr(outerCorners(slice)),
           fill: "none",
           stroke: PERIMETER_HIGHLIGHT,
@@ -277,7 +319,8 @@ const buildSliceView = (config, bbox, state) => {
       }
     }
 
-    // The title above the highest corner of all the slices, centered on them.
+    // The title above the highest corner of all the slices, centered on them
+    // (as laid out without a pop-out, so a hover doesn't move it).
     const pts = slices.flatMap(outerCorners);
     const minX = Math.min(...pts.map((q) => q.x)), maxX = Math.max(...pts.map((q) => q.x));
     const gridTop = Math.min(...pts.map((q) => q.y));
@@ -297,6 +340,7 @@ const buildSliceView = (config, bbox, state) => {
   // every square, redraws the pieces and highlights the focus level's
   // boundary lines.
   const refresh = (state) => {
+    lastState = state;
     plane = config.plane(state);
     if (layoutKey(state.viewMode, plane) !== laidOutFor) layout(state.viewMode, plane);
     subtitleEl.textContent = subtitleText();
@@ -304,9 +348,11 @@ const buildSliceView = (config, bbox, state) => {
     for (const { el: line, boundaryIndex } of frameLines) {
       line.setAttribute("stroke", perimeterStroke(boundaryIndex, state.level));
     }
-    diagGroup.setAttribute("display", state.show3dDiagonals ? "inline" : "none");
-    piecesEl.replaceChildren();
-    for (const { slice, col, row, checkerEl, diagEl } of squares) {
+    for (const layer of layers) {
+      layer.diag.setAttribute("display", state.show3dDiagonals ? "inline" : "none");
+      layer.pieces.replaceChildren();
+    }
+    for (const { slice, col, row, checkerEl, diagEl, piecesEl } of squares) {
       const cell = config.cellAt(col, row, planeOf(slice));
       const { rank, level, file } = cell;
       const variant = isDarkCell(rank, level, file) ? "dark" : "light";
@@ -322,6 +368,19 @@ const buildSliceView = (config, bbox, state) => {
     }
   };
   refresh(state);
+
+  // Hover tracking, on the view's root: a relayout replaces the square under
+  // the cursor, so the squares' own enter/leave events aren't reliable. The
+  // popped-out slice covers its unhovered footprint, so the cursor stays on
+  // it. Moving onto anything but an exploded slice's checker, or out of the
+  // view, ends the hover.
+  const setHovered = (p) => {
+    if (p === hovered) return;
+    hovered = p;
+    if (layoutKey(lastState.viewMode, plane) !== laidOutFor) refresh(lastState);
+  };
+  el.addEventListener("pointermove", (e) => setHovered(checkerPlane.get(e.target) ?? null));
+  el.addEventListener("pointerleave", () => setHovered(null));
 
   return { el, refresh };
 };

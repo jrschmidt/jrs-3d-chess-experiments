@@ -642,7 +642,8 @@ try {
     // subtitle above them and the plane picker right of them, left of the
     // separator. Clicking a square in another slice selects only that rank
     // (the cell's level and file stay), making its slice the large one;
-    // clicking a square in the large slice selects that cell.
+    // clicking a square in the large slice selects that cell. Hovering a
+    // small slice pops it out (see the hover checks below).
     await page.locator('#view-mode-picker [data-value="isoX"]').click();
     const isoX = await gridShape();
     if (prefix !== "front") {
@@ -701,14 +702,99 @@ try {
       await checkExploded(CARRIED.rank, `rank ${CARRIED.rank} selected`);
       await page.screenshot({ path: path.join(outDir, "screenshot-front-isox.png") });
       console.log(`screenshot: ${path.join(outDir, "screenshot-front-isox.png")}`);
-      // Clicks the middle square (file 3, level 3) of the slice at index
-      // `i` (rank 8 - i): square index i * 25 + 2 * 5 + 2.
+      // The screen point of the middle square (file 3, level 3) of the slice
+      // at index `i` (rank 8 - i): square index i * 25 + 2 * 5 + 2.
+      const middleOf = (i) => page.evaluate((i) => {
+        const r = document.querySelectorAll("#front-checkers polygon")[i * 25 + 12].getBoundingClientRect();
+        return { x: r.x + r.width / 2, y: r.y + r.height / 2 };
+      }, i);
+      // Off every slice (the page's top left corner), ending any hover.
+      const mouseAway = () => page.mouse.move(2, 2);
+
+      // Hover: with rank 8 selected, the cursor over rank 7's (small) slice
+      // pops it out into #front-hover: 25 squares, 1.7 times its unhovered
+      // width around the same center, with its pieces, drawn after (over)
+      // everything else; the other 7 slices (175 squares), the subtitle and
+      // the plane picker don't move, and the display state doesn't change.
+      // Rank 7 holds black's pawns, so the popped-out layer must have pieces.
+      // Rank 1's slice, at the right end, is nudged left to stay clear of
+      // the plane picker. Moving away restores the unhovered layout.
+      const hoverShape = () => page.evaluate(() => {
+        const pts = (sel) => [...document.querySelectorAll(sel)]
+          .map((p) => p.getAttribute("points").split(" ").map((q) => q.split(",").map(Number)));
+        const hover = pts("#front-hover-checkers polygon").flat();
+        const xs = hover.map((q) => q[0]), ys = hover.map((q) => q[1]);
+        const box = (id) => document.getElementById(id).getBoundingClientRect();
+        const ctm = document.getElementById("front-checkers").getScreenCTM();
+        return {
+          base: pts("#front-checkers polygon").map((p) => p.join(" ")).join("|"),
+          baseSquares: document.querySelectorAll("#front-checkers polygon").length,
+          hoverSquares: hover.length / 4,
+          hoverPieces: document.querySelectorAll("#front-hover-pieces > g").length,
+          minX: Math.min(...xs), maxX: Math.max(...xs),
+          cx: (Math.min(...xs) + Math.max(...xs)) / 2, cy: (Math.min(...ys) + Math.max(...ys)) / 2,
+          hoverLast: document.getElementById("front-view").lastElementChild.id,
+          subtitle: document.getElementById("front-subtitle").getAttribute("y"),
+          picker: box("front-plane-picker").left,
+          pickerLeftUser: (box("front-plane-picker").left - ctm.e) / ctm.a,
+        };
+      });
+      const unhovered = await exploded();
+      const before = await hoverShape();
+      const middles = await Promise.all([0, 1, 2, 3, 4, 5, 6, 7].map(middleOf));
+      const hoverAt = async (i) => {
+        const m = middles[i];
+        await page.mouse.move(m.x, m.y);
+        await page.mouse.move(m.x + 1, m.y + 1);
+        const h = await hoverShape();
+        const sl = unhovered.slices[i];
+        const w0 = sl.maxX - sl.minX;
+        const ratio = (h.maxX - h.minX) / w0;
+        return { h, ratio, dCx: h.cx - sl.cx, dCy: h.cy - sl.cy };
+      };
+      {
+        const { h, ratio, dCx, dCy } = await hoverAt(1);
+        const othersFixed = (() => {
+          // The base layer now lacks rank 7's 25 squares; every remaining square
+          // must be where it was.
+          const was = before.base.split("|");
+          const now = h.base.split("|");
+          const expectedNow = [...was.slice(0, 25), ...was.slice(50)];
+          return now.join("|") === expectedNow.join("|");
+        })();
+        console.log(`front iso-x hovering rank 7: ${h.baseSquares} base + ${h.hoverSquares} popped-out squares; width ratio ${ratio.toFixed(3)}; center moved ${dCx.toFixed(2)},${dCy.toFixed(2)}; others fixed ${othersFixed}; ${h.hoverPieces} popped-out pieces; drawn last ${h.hoverLast}; subtitle/picker fixed ${h.subtitle === before.subtitle && h.picker === before.picker}`);
+        if (h.baseSquares !== 175 || h.hoverSquares !== 25 || Math.abs(ratio - 1.7) > 0.02
+            || Math.abs(dCx) > 0.5 || Math.abs(dCy) > 0.5 || !othersFixed || h.hoverPieces === 0 || h.hoverLast !== "front-hover"
+            || h.subtitle !== before.subtitle || h.picker !== before.picker) {
+          console.error("FAIL: hovering rank 7's slice should pop it out 1.7x in place, on top, without moving anything else");
+          exitCode = 1;
+        }
+        await page.screenshot({ path: path.join(outDir, "screenshot-front-isox-hover.png") });
+        console.log(`screenshot: ${path.join(outDir, "screenshot-front-isox-hover.png")}`);
+        await checkState("front iso-x while hovering rank 7", expected);
+      }
+      {
+        const { h, ratio } = await hoverAt(7);
+        console.log(`front iso-x hovering rank 1: width ratio ${ratio.toFixed(3)}; right edge ${h.maxX.toFixed(1)} vs picker ${h.pickerLeftUser.toFixed(1)}`);
+        if (h.hoverSquares !== 25 || Math.abs(ratio - 1.7) > 0.02 || !(h.maxX < h.pickerLeftUser)) {
+          console.error("FAIL: hovering rank 1's slice should pop it out 1.7x, kept left of the plane picker");
+          exitCode = 1;
+        }
+      }
+      await mouseAway();
+      {
+        const h = await hoverShape();
+        console.log(`front iso-x after the hover: ${h.baseSquares} base + ${h.hoverSquares} popped-out squares; layout restored ${h.base === before.base}`);
+        if (h.baseSquares !== 200 || h.hoverSquares !== 0 || h.base !== before.base) {
+          console.error("FAIL: moving off the slices should restore the unhovered layout");
+          exitCode = 1;
+        }
+      }
+
       const clickMiddle = async (i) => {
-        const target = await page.evaluate((i) => {
-          const r = document.querySelectorAll("#front-checkers polygon")[i * 25 + 12].getBoundingClientRect();
-          return { x: r.x + r.width / 2, y: r.y + r.height / 2 };
-        }, i);
+        const target = await middleOf(i);
         await page.mouse.click(target.x, target.y);
+        await mouseAway();
       };
       await clickMiddle(3);
       await checkState("front iso-x after clicking rank 5's (small) slice", { ...expected, rank: 5 });
