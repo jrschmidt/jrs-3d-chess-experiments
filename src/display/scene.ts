@@ -8,14 +8,17 @@ import {
 } from './render/cellColors.ts';
 import { buildCubeView } from './drawCube/drawCube.ts';
 import { buildSliceViews } from './drawSlice/drawSlice.ts';
-import { buildCellPickerCube } from './widgets/cellPickerCube.ts';
+import { buildCellIndicatorCube } from './widgets/cellIndicatorCube.ts';
 import { buildDiagToggle } from './widgets/diagToggle.ts';
 import { buildViewOption } from './widgets/viewOption.ts';
+import { buildViewModePicker } from './widgets/viewModePicker.ts';
 import { buildCellDisplay } from './widgets/cellDisplay.ts';
-import { DISPLAY_CHANGE, TEXT_STYLE, buildViewTitle } from './widgets/widgetChrome.ts';
+import {
+  DISPLAY_CHANGE, TEXT_STYLE, buildViewTitle, buildSeparatorLine,
+} from './widgets/widgetChrome.ts';
 import {
   getDisplayState,
-  changeView, setPerspective, setLevel, setRank, setFile, setShow3dDiagonals,
+  changeView, setPerspective, setLevel, setRank, setFile, setShow3dDiagonals, setViewMode,
 } from './displayState.ts';
 
 // The scene controller: builds the whole #scene SVG (the views, the
@@ -29,20 +32,19 @@ import {
 // / NOT IMPLEMENTED" placeholder for a view that isn't drawn yet
 // (front-black, side-black).
 let views = {};
-// The cube view's controller, also kept on its own for drawPieces and
-// shrinkCubeToClear.
+// The cube view's controller, also kept on its own for drawPieces.
 let cubeView = null;
 let notImplementedEl = null;
 // The cube's title, outside the cube's group (see buildScene), so shown and
 // hidden separately.
 let cubeTitleEl = null;
 
-// Populated by buildScene; refreshCellDisplay updates it.
+// Populated by buildControls; refreshDisplay resyncs them to displayState
+// (refreshCellDisplay updates the cell display).
 let cellDisplayEl = null;
-
-// Populated by buildControls; refreshDisplay resyncs them to displayState.
-let cellPickerCubeEl = null;
+let cellIndicatorCubeEl = null;
 let diagToggleEl = null;
+let viewModePickerEl = null;
 
 // Draws the cube's pieces, once the game state is set up (see app.ts). The
 // slice views draw their own pieces on every refresh.
@@ -62,8 +64,9 @@ const refreshDisplay = () => {
   notImplementedEl.setAttribute("display", state.view in views ? "none" : "inline");
   cubeTitleEl.setAttribute("display", state.view === "cube-view" ? "inline" : "none");
   // A view change can reset fields other widgets own, so resync them.
-  cellPickerCubeEl.setValue({ level: state.level, rank: state.rank, file: state.file });
+  cellIndicatorCubeEl.setValue({ level: state.level, rank: state.rank, file: state.file });
   diagToggleEl.setValue(state.show3dDiagonals);
+  viewModePickerEl.setValue(state.viewMode);
   refreshCellDisplay(state);
 };
 
@@ -92,6 +95,7 @@ const SETTERS = {
   rank: setRank,
   file: setFile,
   show3dDiagonals: setShow3dDiagonals,
+  viewMode: setViewMode,
 };
 
 const onDisplayChange = (e) => {
@@ -127,80 +131,73 @@ const buildNotImplemented = (bbox) => {
   return g;
 };
 
-// The cell picker cube just right of the cube, level with its bottom — so bbox
-// must already cover the whole cube — then the diagonal toggle at the
-// right, halfway down, with the view selector just to its left.
-const buildControls = (svg, bbox, state) => {
+// The gap on each side of the separator line between the view and the
+// widget column.
+const SEPARATOR_GAP = PITCH * 0.3;
+
+// Moves widgets right by dx (their root groups have no transform of their
+// own), keeping their bounds in step.
+const shiftX = (widgets, dx) => {
+  for (const w of widgets) {
+    w.el.setAttribute("transform", `translate(${dx.toFixed(2)}, 0)`);
+    w.minX += dx;
+    w.maxX += dx;
+  }
+};
+
+// The widget column, right of the cube's bbox (which every view fits in) and
+// starting at colLeft: the cell display at the top; halfway down, a row of
+// the view selector, the view mode picker and the diagonal toggle, left to
+// right; and the cell indicator cube at the bottom, level with the cube's
+// bottom. The three rows are centered on the column's center line. bbox must cover just the cube; the widgets are
+// merged into it.
+const buildControls = (svg, bbox, colLeft, state) => {
   // Halfway down the page: the viewBox is centered vertically on the page,
   // and no widget extends the bbox vertically past the cube.
   const centerY = (bbox.minY + bbox.maxY) / 2;
   const gap = PITCH * 0.2;
 
-  const cellPickerCube = buildCellPickerCube(bbox.maxX + gap, bbox.maxY, {
+  // Built at the column's left, then centered below.
+  const cellDisplay = buildCellDisplay(colLeft, bbox.minY + PITCH * 0.4);
+  const diagToggle = buildDiagToggle(colLeft, centerY, { initial: state.show3dDiagonals });
+  const viewModePicker = buildViewModePicker(diagToggle.minX - gap, centerY, { initial: state.viewMode });
+  const viewOption = buildViewOption(viewModePicker.minX - gap, centerY, { initial: state.view });
+  const cellIndicatorCube = buildCellIndicatorCube(colLeft, bbox.maxY, {
     initial: { level: state.level, rank: state.rank, file: state.file },
     checkerColors: CHECKER_COLORS.focus,
     edgeColor: PERIMETER_COLOR,
     isDarkCell,
   });
-  svg.appendChild(cellPickerCube.el);
-  mergeBounds(bbox, cellPickerCube);
-  cellPickerCubeEl = cellPickerCube;
 
-  // Right-aligned with the cell picker cube, the scene's rightmost point.
-  const diagToggle = buildDiagToggle(cellPickerCube.maxX, centerY, {
-    initial: state.show3dDiagonals,
+  const rows = [[cellDisplay], [viewOption, viewModePicker, diagToggle], [cellIndicatorCube]];
+  const span = (row) => ({
+    minX: Math.min(...row.map((w) => w.minX)), maxX: Math.max(...row.map((w) => w.maxX)),
   });
-  svg.appendChild(diagToggle.el);
-  mergeBounds(bbox, diagToggle);
+  const width = Math.max(...rows.map((row) => span(row).maxX - span(row).minX));
+  const cx = colLeft + width / 2;
+  for (const row of rows) {
+    const { minX, maxX } = span(row);
+    shiftX(row, cx - (minX + maxX) / 2);
+    for (const w of row) {
+      svg.appendChild(w.el);
+      mergeBounds(bbox, w);
+    }
+  }
+
+  cellDisplayEl = cellDisplay;
   diagToggleEl = diagToggle;
-
-  // The view selector sits a gap left of the diag toggle, centered on the
-  // same height.
-  const viewOption = buildViewOption(diagToggle.minX - gap, centerY, {
-    initial: state.view,
-  });
-  svg.appendChild(viewOption.el);
-  mergeBounds(bbox, viewOption);
+  viewModePickerEl = viewModePicker;
+  cellIndicatorCubeEl = cellIndicatorCube;
 };
 
-// Returns the viewBox's top-right corner.
+// Returns the viewBox rect.
 const fitViewBox = (svg, bbox) => {
   const pad = PITCH * 0.6;
   const vbX = bbox.minX - pad, vbY = bbox.minY - pad;
   const vbW = (bbox.maxX - bbox.minX) + pad * 2, vbH = (bbox.maxY - bbox.minY) + pad * 2;
   svg.setAttribute("viewBox", `${vbX} ${vbY} ${vbW} ${vbH}`);
   svg.setAttribute("preserveAspectRatio", "xMidYMid meet");
-  return { x: vbX + vbW, y: vbY };
-};
-
-// The cell display's margin from the top and right edges of the page.
-const CELL_DISPLAY_MARGIN = PITCH;
-
-// Moves the cell display so it sits CELL_DISPLAY_MARGIN in from the page's
-// top-right corner. It's built that far in from the viewBox's corner, and
-// the page's corner is always at or beyond the viewBox's (the viewBox is
-// letterboxed with "meet"), so this only ever moves it up or right, away
-// from the rest of the scene. Reruns on every resize.
-const positionCellDisplay = (svg) => {
-  const rect = svg.getBoundingClientRect();
-  const pt = svg.createSVGPoint();
-  pt.x = rect.right; pt.y = rect.top;
-  const corner = pt.matrixTransform(svg.getScreenCTM().inverse());
-  const dx = Math.max(0, corner.x - CELL_DISPLAY_MARGIN - cellDisplayEl.maxX);
-  const dy = Math.min(0, corner.y + CELL_DISPLAY_MARGIN - cellDisplayEl.minY);
-  cellDisplayEl.el.setAttribute("transform", `translate(${dx.toFixed(2)}, ${dy.toFixed(2)})`);
-};
-
-// Shrinks the cube about its bottom-left corner, just enough that its right
-// edge clears the cell display's left edge. Everything else is laid out
-// from the unscaled cube, so nothing else moves; the cube's piece icons and
-// diag squares are inside its group, so they shrink with it.
-const shrinkCubeToClear = (cubeBbox, clearX) => {
-  const px = cubeBbox.minX, py = cubeBbox.maxY;
-  const k = Math.min(1, (clearX - px) / (cubeBbox.maxX - px));
-  cubeView.el.setAttribute("transform",
-    `translate(${px.toFixed(2)}, ${py.toFixed(2)}) scale(${k.toFixed(4)}) translate(${(-px).toFixed(2)}, ${(-py).toFixed(2)})`);
-  return k;
+  return { x: vbX, y: vbY, width: vbW, height: vbH };
 };
 
 export const buildScene = () => {
@@ -221,23 +218,18 @@ export const buildScene = () => {
   notImplementedEl = buildNotImplemented(cubeBbox);
   svg.appendChild(notImplementedEl);
 
-  const bbox = { ...cubeBbox };
-  buildControls(svg, bbox, state);
-  const vbCorner = fitViewBox(svg, bbox);
-
-  cellDisplayEl = buildCellDisplay(vbCorner.x - CELL_DISPLAY_MARGIN, vbCorner.y + CELL_DISPLAY_MARGIN);
-  svg.appendChild(cellDisplayEl.el);
-  const k = shrinkCubeToClear(cubeBbox, cellDisplayEl.minX - PITCH * 0.3);
-
-  // Outside the cube's group, so it doesn't shrink with the cube, but placed
-  // over the shrunken cube (scaled about its bottom-left corner). It sits
-  // in the viewBox's top padding (see fitViewBox).
-  const { minX, maxX, minY, maxY } = cubeBbox;
-  cubeTitleEl = buildViewTitle("Cube View", minX + k * ((minX + maxX) / 2 - minX), maxY - k * (maxY - minY), "cube-title");
+  // Outside the cube's group, in the viewBox's top padding (see fitViewBox).
+  const { minX, maxX, minY } = cubeBbox;
+  cubeTitleEl = buildViewTitle("Cube View", (minX + maxX) / 2, minY, "cube-title");
   svg.appendChild(cubeTitleEl);
 
-  positionCellDisplay(svg);
-  window.addEventListener("resize", () => positionCellDisplay(svg));
+  // The separator line between the views and the widget column, the
+  // viewBox's full height.
+  const sepX = cubeBbox.maxX + SEPARATOR_GAP;
+  const bbox = { ...cubeBbox };
+  buildControls(svg, bbox, sepX + SEPARATOR_GAP, state);
+  const vb = fitViewBox(svg, bbox);
+  svg.appendChild(buildSeparatorLine(sepX, vb.y, vb.y + vb.height, "widget-separator"));
 
   svg.addEventListener(DISPLAY_CHANGE, onDisplayChange);
   refreshDisplay();

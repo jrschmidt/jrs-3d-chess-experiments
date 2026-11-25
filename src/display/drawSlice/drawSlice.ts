@@ -94,7 +94,7 @@ const buildSliceView = (config, bbox, state) => {
       style: "cursor: pointer",
     });
     // Clicking a square selects its cell in the plane on screen: one
-    // display-change per field, handled like the cell picker cube's.
+    // display-change per field, handled like the cell indicator cube's.
     checkerEl.addEventListener("click", () => {
       const { level, rank, file } = config.cellAt(col, row, plane);
       emitDisplayChange(checkerEl, "level", level);

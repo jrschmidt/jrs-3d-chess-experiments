@@ -1,8 +1,8 @@
 #!/usr/bin/env node
 // Driver for Chess 321 (formerly x3d-chess and clc-26-004, the "5x5x8 Cube"
 // isometric SVG visualization): starts the Vite dev server, drives the app with
-// Playwright/Chromium, takes screenshots, exercises the cell picker cube, diagonal
-// toggle and view-option widgets, and reports console errors.
+// Playwright/Chromium, takes screenshots, exercises the cell indicator cube, diagonal
+// toggle, view-option and view mode picker widgets, and reports console errors.
 //
 // Usage:
 //   node .claude/skills/run-clc-26-004/driver.mjs [outDir]
@@ -64,30 +64,30 @@ try {
   await page.screenshot({ path: path.join(outDir, "screenshot.png") });
   console.log(`screenshot: ${path.join(outDir, "screenshot.png")}`);
 
-  // The cell picker cube (see buildCellPickerCube in src/display/widgets/cellPickerCube.ts)
+  // The cell indicator cube (see buildCellIndicatorCube in src/display/widgets/cellIndicatorCube.ts)
   // has one hit target per numeral, the only elements with a `cursor:
-  // pointer` style in its #cell-picker-cube-<field> group, in drawn order: level
+  // pointer` style in its #cell-indicator-cube-<field> group, in drawn order: level
   // 5..1, rank 8..1, file 1..5. pick(field, value) clicks one; shownValue
   // reads which numeral is highlighted (shown at full opacity).
   const PICKER_ORDER = { level: [5, 4, 3, 2, 1], rank: [8, 7, 6, 5, 4, 3, 2, 1], file: [1, 2, 3, 4, 5] };
   const pick = (field, value) =>
-    page.locator(`#cell-picker-cube-${field} rect[style*="cursor: pointer"]`).nth(PICKER_ORDER[field].indexOf(value)).click();
+    page.locator(`#cell-indicator-cube-${field} rect[style*="cursor: pointer"]`).nth(PICKER_ORDER[field].indexOf(value)).click();
   const shownValue = (field) => page.evaluate((field) =>
-    [...document.querySelectorAll(`#cell-picker-cube-${field} text`)]
+    [...document.querySelectorAll(`#cell-indicator-cube-${field} text`)]
       .filter((t) => t.getAttribute("opacity") === "1").map((t) => t.textContent).join(","), field);
 
-  // Representative interaction: click the picker's level 2 and confirm the
+  // Representative interaction: click the indicator cube's level 2 and confirm the
   // highlighted LEVEL numeral moves (1 -> 2).
   const before = await shownValue("level");
   await pick("level", 2);
   const after = await shownValue("level");
   console.log(`focus level: ${before} -> ${after}`);
   if (before !== "1" || after !== "2") {
-    console.error("FAIL: clicking level 2 in the cell picker cube did not move the LEVEL highlight from 1 to 2");
+    console.error("FAIL: clicking level 2 in the cell indicator cube did not move the LEVEL highlight from 1 to 2");
     exitCode = 1;
   }
 
-  // The picker cube draws the selected level's squares in green, the
+  // The indicator cube draws the selected level's squares in green, the
   // selected rank's in red and the selected file's in blue, squares on two
   // of them in a mix and the selected cell (when on the surface) in orange.
   // Counts per class (L, R, F, LR, LF, RF, LRF) over the 105 face squares,
@@ -97,8 +97,8 @@ try {
     L: ["#339933", "#336633"], R: ["#993333", "#663333"], F: ["#333399", "#333366"],
     LR: ["#999933"], LF: ["#339999"], RF: ["#993399"], LRF: ["#ff8000"],
   };
-  const pickerHighlights = () => page.evaluate((classes) => {
-    const fills = [...document.querySelectorAll("#cell-picker-cube-faces polygon")].map((p) => p.getAttribute("fill"));
+  const indicatorHighlights = () => page.evaluate((classes) => {
+    const fills = [...document.querySelectorAll("#cell-indicator-cube-faces polygon")].map((p) => p.getAttribute("fill"));
     return Object.entries(classes)
       .map(([name, colors]) => `${name} ${fills.filter((f) => colors.includes(f)).length}`).join(", ");
   }, HIGHLIGHT_FILLS);
@@ -109,10 +109,10 @@ try {
   ];
   for (const { cell, picks, expected } of HIGHLIGHT_CHECKS) {
     for (const [field, value] of picks) await pick(field, value);
-    const got = await pickerHighlights();
-    console.log(`picker highlights at ${cell}: ${got}`);
+    const got = await indicatorHighlights();
+    console.log(`indicator cube highlights at ${cell}: ${got}`);
     if (got !== expected) {
-      console.error(`FAIL: expected picker highlights at ${cell}: ${expected}`);
+      console.error(`FAIL: expected indicator cube highlights at ${cell}: ${expected}`);
       exitCode = 1;
     }
   }
@@ -160,7 +160,7 @@ try {
   // should show only that view's group, keep the selected cell but reset
   // the other displayState fields to the view's initial state
   // (initDisplayStates in src/display/displayState.ts; checked through the
-  // cell picker cube and diag toggle), and move no widget. Its piece icons must be the same size as
+  // cell indicator cube and diag toggle), and move no widget. Its piece icons must be the same size as
   // the cube's, and the diag toggle must show its own overlay in the cube
   // overlay's colors.
   const viewRows = page.locator('#view-option rect[style*="cursor: pointer"]');
@@ -171,7 +171,7 @@ try {
   const showsOnly = (display, id) =>
     Object.entries(display).every(([k, v]) => v === (k === id ? "inline" : "none"));
   const widgetBoxes = () => page.evaluate(() =>
-    ["cell-picker-cube", "diag-toggle", "view-option"].map((id) => {
+    ["cell-indicator-cube", "diag-toggle", "view-option", "view-mode-picker"].map((id) => {
       const r = document.getElementById(id).getBoundingClientRect();
       // Position only: sizes can change with content, which isn't a move.
       return `${id}:${r.x.toFixed(1)},${r.y.toFixed(1)}`;
@@ -183,7 +183,7 @@ try {
   }, sel);
   const diagLabel = page.locator('#diag-toggle text[dominant-baseline="central"]');
   // displayState isn't shown on the page, so it's checked through the
-  // widgets that show it (the cell picker cube's highlights and the diag toggle); `view` and `perspective` in `expected` aren't
+  // widgets that show it (the cell indicator cube's highlights and the diag toggle); `view` and `perspective` in `expected` aren't
   // checked here (the view is checked by which group sceneDisplay shows).
   const checkState = async (name, expected) => {
     const shown = {
@@ -233,7 +233,7 @@ try {
   const EMPTY_CELL = { empty: true, color: null, letter: null, name: null, icon: false };
   await checkCell("rank/file before", { coords: "2, 4, 1", values: "2,4,1", ...EMPTY_CELL, diag: "#b300b3" });
 
-  // The picker's RANK and FILE numerals change only their own displayState
+  // The indicator cube's RANK and FILE numerals change only their own displayState
   // field. At this point the cube is at level 2 with diagonals on.
   await pick("rank", 5);
   await pick("file", 2);
@@ -247,55 +247,119 @@ try {
   await page.screenshot({ path: path.join(outDir, "screenshot-cell-black.png") });
   console.log(`screenshot: ${path.join(outDir, "screenshot-cell-black.png")}`);
 
-  // The cell display sits one front-view cell (on screen) in from the
-  // page's top and right edges, right of the shrunken cube, overlapping
-  // no widget.
-  const cellPlacement = await page.evaluate(() => {
+  // The widgets form one column right of the separator line, centered on
+  // one vertical line: the cell display at the top, the view selector +
+  // view mode picker + diag toggle row halfway down the page, the cell indicator cube at the
+  // bottom. None overlap.
+  const column = await page.evaluate(() => {
     const box = (id) => document.getElementById(id).getBoundingClientRect();
-    const c = box("cell-display");
-    const overlaps = ["cell-picker-cube", "diag-toggle", "view-option"]
-      .filter((id) => {
-        const w = box(id);
-        return w.left < c.right && c.left < w.right && w.top < c.bottom && c.top < w.bottom;
-      });
+    const c = box("cell-display"), v = box("view-option"), d = box("diag-toggle"), m = box("view-mode-picker");
+    const p = box("cell-indicator-cube");
+    const ids = ["cell-display", "view-option", "diag-toggle", "view-mode-picker", "cell-indicator-cube"];
+    const overlaps = ids.flatMap((a, i) => ids.slice(i + 1).filter((b) => {
+      const x = box(a), y = box(b);
+      return x.left < y.right && y.left < x.right && x.top < y.bottom && y.top < x.bottom;
+    }).map((b) => `${a}/${b}`));
     return {
-      top: c.top, right: window.innerWidth - c.right, left: c.left,
-      cubeRight: box("cube").right, overlaps,
+      cellCenter: (c.left + c.right) / 2, rowCenter: (v.left + d.right) / 2,
+      indicatorCenter: (p.left + p.right) / 2,
+      cellBottom: c.bottom, rowTop: Math.min(v.top, d.top, m.top), rowBottom: Math.max(v.bottom, d.bottom, m.bottom),
+      indicatorTop: p.top, diagCenterY: d.y + d.height / 2, pageCenterY: window.innerHeight / 2,
+      left: Math.min(c.left, v.left, p.left), overlaps,
     };
   });
+  console.log(`widget column: centers cell display ${column.cellCenter.toFixed(1)}, row ${column.rowCenter.toFixed(1)}, indicator cube ${column.indicatorCenter.toFixed(1)}; diag toggle center y ${column.diagCenterY.toFixed(1)} (page ${column.pageCenterY}); overlaps ${JSON.stringify(column.overlaps)}`);
+  if (Math.abs(column.cellCenter - column.indicatorCenter) > 1 || Math.abs(column.rowCenter - column.indicatorCenter) > 1
+      || column.cellBottom > column.rowTop || column.rowBottom > column.indicatorTop
+      || Math.abs(column.diagCenterY - column.pageCenterY) > 5 || column.overlaps.length) {
+    console.error("FAIL: cell display, selector/toggle row and cell indicator cube should be stacked top to bottom on one center line, the row halfway down the page, none overlapping");
+    exitCode = 1;
+  }
 
-  // The cell picker cube sits just right of the cube, below the diag toggle; the
-  // diag toggle sits at the right, halfway down the page, right-aligned with
-  // the picker.
-  const diagPlacement = await page.evaluate(() => {
-    const box = (id) => document.getElementById(id).getBoundingClientRect();
-    const d = box("diag-toggle"), p = box("cell-picker-cube");
-    return { centerY: d.y + d.height / 2, pageCenterY: window.innerHeight / 2, right: d.right, bottom: d.bottom,
-      pickerRight: p.right, pickerLeft: p.left, pickerTop: p.top, cubeRight: box("cube").right };
+  // The separator line, styled like the widget outlines, runs between the
+  // cube and the widget column (the slice grids are checked in their views).
+  const separatorInfo = () => page.evaluate(() => {
+    const s = document.getElementById("widget-separator");
+    const r = s.getBoundingClientRect();
+    return { x: (r.left + r.right) / 2, top: r.top, bottom: r.bottom,
+      stroke: s.getAttribute("stroke"), width: s.getAttribute("stroke-width"),
+      cubeRight: document.getElementById("cube").getBoundingClientRect().right };
   });
-  console.log(`cell picker cube: left ${diagPlacement.pickerLeft.toFixed(1)} (cube right ${diagPlacement.cubeRight.toFixed(1)}), top ${diagPlacement.pickerTop.toFixed(1)} (diag toggle bottom ${diagPlacement.bottom.toFixed(1)})`);
-  console.log(`diag toggle: center y ${diagPlacement.centerY.toFixed(1)} (page ${diagPlacement.pageCenterY}), right ${diagPlacement.right.toFixed(1)} (cell picker cube ${diagPlacement.pickerRight.toFixed(1)})`);
-  if (diagPlacement.pickerLeft <= diagPlacement.cubeRight || diagPlacement.pickerTop <= diagPlacement.bottom) {
-    console.error("FAIL: cell picker cube should be right of the cube and below the diag toggle");
-    exitCode = 1;
-  }
-  if (Math.abs(diagPlacement.centerY - diagPlacement.pageCenterY) > 5
-      || Math.abs(diagPlacement.right - diagPlacement.pickerRight) > 1) {
-    console.error("FAIL: diag toggle should be halfway down the page, right-aligned with the cell picker cube");
+  const separator = await separatorInfo();
+  console.log(`separator: ${JSON.stringify(separator)}; widget column left ${column.left.toFixed(1)}`);
+  if (separator.stroke !== "rgba(255,255,255,0.25)" || separator.width !== "1"
+      || !(separator.x > separator.cubeRight) || !(separator.x < column.left)
+      || !(separator.bottom - separator.top > 500)) {
+    console.error("FAIL: separator should be a full-height panel-outline line between the cube and the widget column");
     exitCode = 1;
   }
 
-  // The view selector sits just left of the diag toggle, centered on the
-  // same height.
+  // The view selector sits just left of the view mode picker, centered on
+  // the same height as the diag toggle.
   const viewPlacement = await page.evaluate(() => {
     const v = document.getElementById("view-option").getBoundingClientRect();
+    const m = document.getElementById("view-mode-picker").getBoundingClientRect();
     const d = document.getElementById("diag-toggle").getBoundingClientRect();
-    return { gap: d.left - v.right, centerY: v.y + v.height / 2, diagCenterY: d.y + d.height / 2 };
+    return { gap: m.left - v.right, centerY: v.y + v.height / 2, diagCenterY: d.y + d.height / 2 };
   });
-  console.log(`view option: gap to diag toggle ${viewPlacement.gap.toFixed(1)}, center y ${viewPlacement.centerY.toFixed(1)} (diag toggle ${viewPlacement.diagCenterY.toFixed(1)})`);
+  console.log(`view option: gap to view mode picker ${viewPlacement.gap.toFixed(1)}, center y ${viewPlacement.centerY.toFixed(1)} (diag toggle ${viewPlacement.diagCenterY.toFixed(1)})`);
   if (viewPlacement.gap <= 0 || viewPlacement.gap > 30
       || Math.abs(viewPlacement.centerY - viewPlacement.diagCenterY) > 5) {
-    console.error("FAIL: view option should sit just left of the diag toggle, centered on the same height");
+    console.error("FAIL: view option should sit just left of the view mode picker, centered on the diag toggle's height");
+    exitCode = 1;
+  }
+
+  // The view mode picker sits just left of the diag toggle, centered on the
+  // same height, captioned "View Mode", offering Basic and Iso (Iso-X is
+  // commented out for now) with Basic selected. Picking Iso highlights it
+  // without changing the view shown or moving any widget (Iso draws the
+  // same as Basic for now) and keeps it across view changes; picking Basic
+  // puts it back.
+  const modeInfo = () => page.evaluate(() => {
+    const g = document.getElementById("view-mode-picker");
+    const r = g.getBoundingClientRect();
+    const d = document.getElementById("diag-toggle").getBoundingClientRect();
+    const texts = [...g.querySelectorAll("text")];
+    const options = texts.slice(1);
+    return {
+      caption: texts[0].textContent, options: options.map((t) => t.textContent).join(","),
+      selected: options.filter((t) => t.getAttribute("opacity") === "1").map((t) => t.textContent).join(","),
+      gap: d.left - r.right, centerY: r.y + r.height / 2, diagCenterY: d.y + d.height / 2,
+    };
+  });
+  const mode = await modeInfo();
+  console.log(`view mode picker: ${JSON.stringify(mode)}`);
+  if (mode.caption !== "View Mode" || mode.options !== "Basic,Iso" || mode.selected !== "Basic"
+      || mode.gap <= 0 || mode.gap > 30 || Math.abs(mode.centerY - mode.diagCenterY) > 5) {
+    console.error("FAIL: view mode picker should be captioned View Mode, offer Basic,Iso with Basic selected, and sit just left of the diag toggle at the same height");
+    exitCode = 1;
+  }
+  const modeBoxesBefore = await widgetBoxes();
+  await page.locator('#view-mode-picker [data-value="iso"]').click();
+  const isoSelected = (await modeInfo()).selected;
+  const isoShowsCube = showsOnly(await sceneDisplay(), "cube");
+  const isoBoxes = await widgetBoxes();
+  console.log(`view mode iso: selected ${isoSelected}; cube shown ${isoShowsCube}; widgets unmoved ${isoBoxes === modeBoxesBefore}`);
+  if (isoSelected !== "Iso" || !isoShowsCube || isoBoxes !== modeBoxesBefore) {
+    console.error("FAIL: picking Iso should highlight it, keep the cube view shown and move no widget");
+    exitCode = 1;
+  }
+  await page.screenshot({ path: path.join(outDir, "screenshot-view-mode-iso.png") });
+  console.log(`screenshot: ${path.join(outDir, "screenshot-view-mode-iso.png")}`);
+  // The view mode carries over on a view change (see changeView): still
+  // Iso in Front View and back in Cube View.
+  await viewRows.nth(1).click();
+  const modeInFront = (await modeInfo()).selected;
+  await viewRows.nth(0).click();
+  const modeBackInCube = (await modeInfo()).selected;
+  console.log(`view mode after view changes: front ${modeInFront}, cube ${modeBackInCube}`);
+  if (modeInFront !== "Iso" || modeBackInCube !== "Iso") {
+    console.error("FAIL: the view mode should stay Iso across view changes");
+    exitCode = 1;
+  }
+  await page.locator('#view-mode-picker [data-value="basic"]').click();
+  if ((await modeInfo()).selected !== "Basic") {
+    console.error("FAIL: picking Basic should highlight it again");
     exitCode = 1;
   }
   // The cell picked above (the black Triton at 2,8,1) carries into every
@@ -356,6 +420,16 @@ try {
       console.error(`FAIL: widgets moved in ${label}\n  before: ${boxesBefore}\n  after:  ${boxes}`);
       exitCode = 1;
     }
+    // The separator stays right of the slice grid and its plane picker.
+    const gridRight = await page.evaluate((prefix) => Math.max(
+      document.getElementById(`${prefix}-checkers`).getBoundingClientRect().right,
+      document.getElementById(`${prefix}-plane-picker`).getBoundingClientRect().right), prefix);
+    const sepX = (await separatorInfo()).x;
+    console.log(`${prefix}: separator x ${sepX.toFixed(1)}, grid/plane picker right ${gridRight.toFixed(1)}`);
+    if (!(sepX > gridRight)) {
+      console.error(`FAIL: ${label} grid and plane picker should be left of the separator`);
+      exitCode = 1;
+    }
     const counts = await page.evaluate((prefix) => ({
       cells: document.querySelectorAll(`#${prefix}-checkers rect`).length,
       pieces: document.querySelectorAll(`#${prefix}-pieces > g`).length,
@@ -367,8 +441,7 @@ try {
       console.error(`FAIL: ${label} should show ${cells} cells and ${pieces} pieces`);
       exitCode = 1;
     }
-    // The flat views' icons all match; the cube's shrink with the cube when
-    // it has to clear the cell display (see shrinkCubeToClear in scene.ts).
+    // The flat views' icons all match, and the cube's are no larger.
     if (size !== flatIconSize) {
       console.error(`FAIL: ${label} icons are not the same size as the other flat views' icons`);
       exitCode = 1;
@@ -378,13 +451,6 @@ try {
       console.log(`cube/flat icon size ratio: ${ratio.toFixed(3)}`);
       if (ratio > 1.001) {
         console.error("FAIL: cube icons should be no larger than the flat views' icons");
-        exitCode = 1;
-      }
-      const cellW = await page.evaluate(() => document.querySelector("#front-checkers rect").getBoundingClientRect().width);
-      console.log(`cell display: top ${cellPlacement.top.toFixed(1)}, right margin ${cellPlacement.right.toFixed(1)} (front cell ${cellW.toFixed(1)}); left ${cellPlacement.left.toFixed(1)} vs cube right ${cellPlacement.cubeRight.toFixed(1)}; overlaps ${JSON.stringify(cellPlacement.overlaps)}`);
-      if (Math.abs(cellPlacement.top - cellW) > 3 || Math.abs(cellPlacement.right - cellW) > 3
-          || cellPlacement.left <= cellPlacement.cubeRight || cellPlacement.overlaps.length) {
-        console.error("FAIL: cell display should be one front cell in from the top-right corner, clear of the cube and widgets");
         exitCode = 1;
       }
       await checkCell("front: black Triton at 2,8,1, carried", {

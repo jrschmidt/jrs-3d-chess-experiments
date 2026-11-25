@@ -53,9 +53,9 @@ CWD. It:
    and polls until `http://localhost:8123/` responds.
 2. Launches headless Chromium, waits for `#checkers polygon`, and
    screenshots to `<outDir>/screenshot.png`.
-3. Clicks level 2 in the cell picker cube (`#cell-picker-cube`, bottom right) and
+3. Clicks level 2 in the cell indicator cube (`#cell-indicator-cube`, bottom right) and
    confirms the highlighted LEVEL numeral moves (`1 -> 2`). Confirms the
-   picker cube's highlight counts at cells 2,4,1, then 5,4,1 (picks level
+   indicator cube's highlight counts at cells 2,4,1, then 5,4,1 (picks level
    5) and 2,4,2 (picks level 2, file 2), then picks file 1 again: the
    selected level's squares in green (`#339933` / `#336633`), rank's in red
    (`#993333` / `#663333`), file's in blue (`#333399` / `#333366`), squares
@@ -65,27 +65,38 @@ CWD. It:
 4. Confirms the diagonal overlay (`#diag-squares`) starts hidden, clicks the
    diag toggle, confirms it shows, and prints its distinct stroke colors;
    screenshots `screenshot-diag-on.png`.
-5. Clicks rank 5 and file 2 in the cell picker cube, confirming its highlights
+5. Clicks rank 5 and file 2 in the cell indicator cube, confirming its highlights
    show only `rank` (4 -> 5) and `file` (1 -> 2) changed, then file 1.
-   Checks the cell display (`#cell-display`, top right) shows the focus
+   Checks the cell display (`#cell-display`, top of the widget column) shows the focus
    cell: first an empty cell with its diag color, then, after clicking rank
    8, the black Triton at 2,8,1 (screenshots `screenshot-cell-black.png`).
-   Confirms the cell picker cube is right of the cube and below the diag toggle,
-   the diag toggle is centered halfway down the page and right-aligned with
-   the cell picker cube, and the view-option widget sits just left of it, centered on the
-   same height.
+   Confirms the widgets form one column, all centered on the same vertical
+   line: the cell display at the top, the view-option widget + view mode
+   picker + diag toggle row (diag toggle halfway down the page) in the middle, the cell indicator
+   cube at the bottom, none overlapping; that the view-option widget sits
+   just left of the view mode picker, centered on the diag toggle's height;
+   that the view mode picker (`#view-mode-picker`) sits just left of the
+   diag toggle at the same height, is captioned "View Mode", offers Basic and Iso (Iso-X is
+   commented out) with Basic selected, and that clicking Iso
+   (`[data-value="iso"]`) highlights it without changing the view or moving
+   a widget (screenshot `screenshot-view-mode-iso.png`), that Iso stays
+   selected after switching to Front View and back to Cube View (the view
+   mode carries over on a view change), then clicks Basic
+   to put it back; and that the
+   separator line (`#widget-separator`, panel-outline stroke
+   `rgba(255,255,255,0.25)`, width 1) runs the page's height between the
+   cube and the widget column.
 6. For each slice view (Front, Top, Side, in that order): clicks the view
    in the view-option widget, carrying in the cell picked in step 5 (the
    black Triton at 2,8,1, with diagonals on). Confirms only its group
    (`#front-view`, `#top-view`, `#side-view`) is shown and no widget moved.
    Checks its cell and piece counts for the carried plane (Front rank 8:
    25/25, Top level 2: 40/20, Side file 1: 40/20), and that its icons match
-   the other flat views' size. In Front it also checks that the cube's
-   icons are no larger than that (the cube shrinks only if it has to clear
-   the cell display), that the cell display sits one front cell in from the
-   page's top-right corner, clear of the cube and every widget, and that it
+   the other flat views' size, and that its grid and plane picker are left
+   of the separator line. In Front it also checks that the cube's
+   icons are no larger than that, and that the cell display
    still shows the Triton at 2,8,1 and its diag color (diagonals carry
-   over). Confirms the cell picker cube still highlights 2/8/1 and the diag
+   over). Confirms the cell indicator cube still highlights 2/8/1 and the diag
    toggle is still ON (the cell and the diagonals carry over; the other
    fields reset to the view's initial state; displayState isn't shown on the
    page, so the widgets are the check). Screenshots `screenshot-<front|top|side>-view.png`. Each
@@ -98,7 +109,7 @@ CWD. It:
    in the cube overlay's colors (screenshots `screenshot-<view>-diag-on.png`),
    then toggles the diagonals off (hidden) and back on (shown). Then clicks one square
    in the view (Front 4,3 → cell 3,8,4; Top 2,7 → 2,7,2; Side 3,4 →
-   4,6,1), confirming the cell picker cube and cell display show that cell,
+   4,6,1), confirming the cell indicator cube and cell display show that cell,
    the plane and view are unchanged (screenshots
    `screenshot-<view>-clicked.png`), and clicks the 2,8,1 square (under a
    piece icon, so the click must pass through it) to put the cell back.
@@ -130,22 +141,25 @@ Sample output from a real run:
 
 ```
 focus level: 1 -> 2
-picker highlights at 2,4,1: L 4, R 4, F 39, LR 0, LF 8, RF 5, LRF 1
-picker highlights at 5,4,1: L 32, R 0, F 32, LR 4, LF 15, RF 4, LRF 2
-picker highlights at 2,4,2: L 11, R 8, F 11, LR 1, LF 1, RF 1, LRF 0
+indicator cube highlights at 2,4,1: L 4, R 4, F 39, LR 0, LF 8, RF 5, LRF 1
+indicator cube highlights at 5,4,1: L 32, R 0, F 32, LR 4, LF 15, RF 4, LRF 2
+indicator cube highlights at 2,4,2: L 11, R 8, F 11, LR 1, LF 1, RF 1, LRF 0
 diag overlay display (before toggle): none
 diag overlay display (after toggle): inline
 diag square colors (hex): #1953ff | #b300b3 | #b34100 | #178217
 rank 5, file 2: widgets level 2, rank 5, file 2, diag ON
 file 1: widgets level 2, rank 5, file 1, diag ON
 cell display (black Triton at 2,8,1): {"coords":"2, 8, 1",...,"color":"BLACK","letter":"T #000000","name":"Triton","icon":true,...}
-cell picker cube: left 996.6 (cube right 981.3), top 573.3 (diag toggle bottom 538.2)
-diag toggle: center y 500.3 (page 500), right 1354.1 (cell picker cube 1353.7)
-view option: gap to diag toggle 15.3, center y 500.0 (diag toggle 500.3)
+widget column: centers cell display 1180.2, row 1180.2, indicator cube 1180.1; diag toggle center y 500.2 (page 500); overlaps []
+separator: {"x":982.8,"top":101.1,"bottom":898.9,"stroke":"rgba(255,255,255,0.25)","width":"1","cubeRight":960.3}; widget column left 1005.3
+view option: gap to view mode picker 15.0, center y 500.0 (diag toggle 500.2)
+view mode picker: {"caption":"View Mode","options":"Basic,Iso","selected":"Basic","gap":15.0,"centerY":500.0,"diagCenterY":500.2}
+view mode iso: selected Iso; cube shown true; widgets unmoved true
+view mode after view changes: front Iso, cube Iso
 front: display {"cube":"none","front-view":"inline","side-view":"none","top-view":"none","not-implemented":"none"}
+front: separator x 982.8, grid/plane picker right 772.1
 front: 25 cells, 25 pieces; icon size cube 41.6x41.6, front 41.6x41.6; widgets unmoved: true
 cube/flat icon size ratio: 1.000
-cell display: top 76.6, right margin 76.6 (front cell 76.6); left 1017.2 vs cube right 981.3; overlaps []
 cell display (front: black Triton at 2,8,1, carried): {"coords":"2, 8, 1",...,"name":"Triton","icon":true,"diag":null}
 front after switching: widgets level 2, rank 8, file 1, diag OFF
 front plane (rank): fill #808080 -> #333333 -> #808080; pieces 25 -> 25 (rank 3: 0) -> 25
@@ -181,7 +195,7 @@ No test suite exists in this repo.
   `fill: rgba(255,255,255,0.001)` (nearly invisible, intentionally) and
   `style="cursor: pointer"` — that inline style is the only reliable
   selector, scoped by the widget's group id:
-  - `#cell-picker-cube-level`, `#cell-picker-cube-rank`, `#cell-picker-cube-file`: one
+  - `#cell-indicator-cube-level`, `#cell-indicator-cube-rank`, `#cell-indicator-cube-file`: one
     per numeral, in drawn order (level 5..1, rank 8..1, file 1..5). The
     selected numeral's `<text>` has `opacity="1"`, the others `0.6`.
   - `#diag-toggle`: a single match.

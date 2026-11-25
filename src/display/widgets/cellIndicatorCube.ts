@@ -6,8 +6,9 @@ import { PITCH, TILT_DEGREES,
 import { svgEl } from '../render/svg.ts';
 import { TEXT_STYLE, makeHitRect, emitDisplayChange } from './widgetChrome.ts';
 
-// Picker for the focus cell: a small opaque isometric cube (the main cube's
-// projection, scaled down, with checkered faces and no pieces), with a row
+// Indicator (and picker) for the focus cell: a small opaque isometric cube
+// (the main cube's projection, scaled down, with checkered faces and no
+// pieces), with a row
 // of clickable numerals along three of its edges:
 //   - FILE  1..5 along the upper-left edge, lower left to upper right
 //   - RANK  8..1 along the lower-left edge, left to right
@@ -15,13 +16,13 @@ import { TEXT_STYLE, makeHitRect, emitDisplayChange } from './widgetChrome.ts';
 // Anchored so its left edge sits at anchorX and its bottom at anchorBottomY
 // (the caller passes a point just right of the main cube, at its bottom).
 //
-// The picker keeps its own level, rank and file and fires a "level",
+// The indicator cube keeps its own level, rank and file and fires a "level",
 // "rank" or "file" display-change event (see emitDisplayChange) when a
 // different numeral is clicked; the current value of each is highlighted.
 // setValue updates them from outside (e.g. when a view change resets
 // displayState) without firing an event. The caller supplies the checker
 // colors ({ light, dark }), the edge color and the checker parity rule
-// (isDarkCell(rank, level, file)), so the picker matches the main cube.
+// (isDarkCell(rank, level, file)), so the indicator cube matches the main cube.
 // The squares of the selected level are drawn in green instead, those of
 // the selected rank in red and those of the selected file in blue (each
 // with the same parity). Squares on two of them are a solid mix (GREEN_RED,
@@ -41,7 +42,7 @@ const HIGHLIGHT_COLORS = {
   LRF: solid(CELL_HIGHLIGHT),
 };
 
-const P = PITCH * 0.33;            // pitch of one cell in the picker
+const P = PITCH * 0.33;            // pitch of one cell in the indicator cube
 const NUM_FONT = P * 0.7;
 const NUM_BOX = P * 0.9;           // numeral highlight / hit-target size
 const NUM_GAP = P * 0.65;          // edge to numeral center
@@ -61,7 +62,7 @@ const project = (r, l, f) => ({ x: (f - r) * C * P, y: -(r + f) * S * P - l * P 
 
 const offset = (pt, dx, dy) => ({ x: pt.x + dx, y: pt.y + dy });
 
-// The four corners of a rotated label's box, for the picker's bounds.
+// The four corners of a rotated label's box, for the indicator cube's bounds.
 const labelCorners = ({ x, y, text, angle }) => {
   const halfW = (text.length * (LABEL_FONT * 0.65 + LABEL_SPACING)) / 2;
   const halfH = LABEL_FONT * 0.6;    // a glyph box is taller than the font size
@@ -134,7 +135,7 @@ const faceSquares = () => {
 
 const pointsAttr = (pts) => pts.map((p) => `${p.x.toFixed(2)},${p.y.toFixed(2)}`).join(" ");
 
-export const buildCellPickerCube = (anchorX, anchorBottomY, { initial, checkerColors, edgeColor, isDarkCell }) => {
+export const buildCellIndicatorCube = (anchorX, anchorBottomY, { initial, checkerColors, edgeColor, isDarkCell }) => {
   const values = { ...initial };
 
   // Bounds before anchoring: the cube, every numeral box and every label.
@@ -157,13 +158,13 @@ export const buildCellPickerCube = (anchorX, anchorBottomY, { initial, checkerCo
   const dx = anchorX - local.minX;
   const dy = anchorBottomY - local.maxY;
 
-  const g = svgEl("g", { id: "cell-picker-cube" });
+  const g = svgEl("g", { id: "cell-indicator-cube" });
   // Everything is drawn in unanchored coordinates inside this group.
   const inner = svgEl("g", { transform: `translate(${dx.toFixed(2)}, ${dy.toFixed(2)})` });
   g.appendChild(inner);
 
   // Colored by restyle, which knows the selected level, rank and file.
-  const faces = svgEl("g", { id: "cell-picker-cube-faces" });
+  const faces = svgEl("g", { id: "cell-indicator-cube-faces" });
   const faceEls = [];
   for (const { corners, cell } of faceSquares()) {
     const el = svgEl("polygon", { points: pointsAttr(corners.map(([r, l, f]) => project(r, l, f))) });
@@ -197,7 +198,7 @@ export const buildCellPickerCube = (anchorX, anchorBottomY, { initial, checkerCo
 
   const numerals = [];
   for (const { field, values: vs, center } of SELECTORS) {
-    const group = svgEl("g", { id: `cell-picker-cube-${field}` });
+    const group = svgEl("g", { id: `cell-indicator-cube-${field}` });
     for (const v of vs) {
       const c = center(v);
       const x0 = c.x - NUM_BOX / 2, y0 = c.y - NUM_BOX / 2;

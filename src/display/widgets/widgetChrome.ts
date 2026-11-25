@@ -45,12 +45,25 @@ export const buildViewSubtitle = (text, x, topY, id) => {
   return el;
 };
 
+// The outline every widget panel (and the separator line) is drawn with.
+export const PANEL_STROKE = "rgba(255,255,255,0.25)";
+export const PANEL_STROKE_WIDTH = 1;
+
 export const makePanelRect = (x0, y0, w, h) =>
   svgEl("rect", {
     x: x0, y: y0, width: w, height: h, rx: 6, ry: 6,
     fill: "rgba(255,255,255,0.05)",
-    stroke: "rgba(255,255,255,0.25)",
-    "stroke-width": 1,
+    stroke: PANEL_STROKE,
+    "stroke-width": PANEL_STROKE_WIDTH,
+  });
+
+// A vertical line at x from y0 to y1, styled like the panel outlines.
+export const buildSeparatorLine = (x, y0, y1, id) =>
+  svgEl("line", {
+    id, x1: x, y1: y0, x2: x, y2: y1,
+    stroke: PANEL_STROKE,
+    "stroke-width": PANEL_STROKE_WIDTH,
+    "pointer-events": "none",
   });
 
 export const makeHitRect = (x0, y0, w, h, onClick) => {

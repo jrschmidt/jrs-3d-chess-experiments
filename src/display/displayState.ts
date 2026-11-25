@@ -8,6 +8,9 @@ export type Perspective = 'all' | 'white' | 'black';
 export type LevelValue = null | 1 | 2 | 3 | 4 | 5;
 export type RankValue = null | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8;
 export type FileValue = null | 1 | 2 | 3 | 4 | 5;
+// How the views are drawn. Only 'basic' is implemented; 'iso' draws the
+// same as 'basic' for now, and 'isoX' isn't offered yet.
+export type ViewMode = 'basic' | 'iso' | 'isoX';
 // Which cell-visibility rule (see cellVisibility.ts) is in effect.
 export type CellVisibilityOption = 'all';
 
@@ -18,14 +21,16 @@ export interface DisplayState {
   rank: RankValue;
   file: FileValue;
   show3dDiagonals: boolean;
+  viewMode: ViewMode;
   cellVisibility: CellVisibilityOption;
 }
 
 // Initial display state for each view, added one view at a time. Every
 // entry is a complete DisplayState; views without one yet are just absent.
 // 'cube-view' is required, since it's the state displayState starts in.
-// The selected cell (level, rank, file) and show3dDiagonals carry over on a
-// view change (see changeView), so only cube-view's are used, at startup.
+// The selected cell (level, rank, file), show3dDiagonals and viewMode carry
+// over on a view change (see changeView), so only cube-view's are used, at
+// startup.
 const initDisplayStates: Readonly<
   { 'cube-view': DisplayState } & Partial<Record<ViewName, DisplayState>>
 > = {
@@ -37,6 +42,7 @@ const initDisplayStates: Readonly<
     rank: 4,
     file: 1,
     show3dDiagonals: false,
+    viewMode: 'basic',
     cellVisibility: 'all',
   },
 
@@ -47,6 +53,7 @@ const initDisplayStates: Readonly<
     rank: 1,
     file: 3,
     show3dDiagonals: false,
+    viewMode: 'basic',
     cellVisibility: 'all',
   },
 
@@ -57,6 +64,7 @@ const initDisplayStates: Readonly<
     rank: 4,
     file: 1,
     show3dDiagonals: false,
+    viewMode: 'basic',
     cellVisibility: 'all',
   },
 
@@ -67,6 +75,7 @@ const initDisplayStates: Readonly<
     rank: 4,
     file: 3,
     show3dDiagonals: false,
+    viewMode: 'basic',
     cellVisibility: 'all',
   },
 
@@ -91,13 +100,13 @@ export const setInitDisplayState = (): void => {
 };
 
 // Switches to `view`. If that view has an initial display state, every
-// field except the selected cell (level, rank, file) and show3dDiagonals is
-// reset to it; otherwise only the view changes.
+// field except the selected cell (level, rank, file), show3dDiagonals and
+// viewMode is reset to it; otherwise only the view changes.
 export const changeView = (view: ViewName): void => {
   const init = initDisplayStates[view];
   if (init) {
-    const { level, rank, file, show3dDiagonals } = displayState;
-    setDisplayState({ ...init, level, rank, file, show3dDiagonals });
+    const { level, rank, file, show3dDiagonals, viewMode } = displayState;
+    setDisplayState({ ...init, level, rank, file, show3dDiagonals, viewMode });
   } else {
     setView(view);
   }
@@ -120,6 +129,9 @@ export const setFile = (file: FileValue): void => { displayState.file = file; };
 
 export const getShow3dDiagonals = (): boolean => displayState.show3dDiagonals;
 export const setShow3dDiagonals = (show: boolean): void => { displayState.show3dDiagonals = show; };
+
+export const getViewMode = (): ViewMode => displayState.viewMode;
+export const setViewMode = (mode: ViewMode): void => { displayState.viewMode = mode; };
 
 export const getCellVisibility = (): CellVisibilityOption => displayState.cellVisibility;
 export const setCellVisibility = (option: CellVisibilityOption): void => { displayState.cellVisibility = option; };
