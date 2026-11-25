@@ -11,6 +11,10 @@ the Vite dev server, launches headless Chromium, screenshots the scene,
 exercises each widget, and reports console errors. All paths below are
 relative to the repo root (`chess-321/`).
 
+In the `isopop` branch the third view mode is Iso-H: the name there for the
+changes and experiments introduced in that branch (so far, the Front View
+hover pop-out). On `main` the mode is Iso-X, without them.
+
 ## Prerequisites
 
 Node.js. Install the app's dependencies (Vite, TypeScript) at the repo root
@@ -77,7 +81,7 @@ CWD. It:
    just left of the view mode picker, centered on the diag toggle's height;
    that the view mode picker (`#view-mode-picker`) sits just left of the
    diag toggle at the same height, is captioned "View Mode", offers Basic, Iso and
-   Iso-X with Basic selected, and that clicking Iso
+   Iso-H with Basic selected, and that clicking Iso
    (`[data-value="iso"]`) highlights it without changing the view or moving
    a widget (screenshot `screenshot-view-mode-iso.png`), that Iso stays
    selected after switching to Front View and back to Cube View (the view
@@ -130,17 +134,17 @@ CWD. It:
    vertical; the subtitle is still above the grid, the plane picker right
    of it, and every piece drawn (screenshots `screenshot-<view>-iso.png`).
    Clicks a square and the carried cell's square again to confirm clicks
-   still select in Iso, then picks Iso-X. Top and Side must draw the same
+   still select in Iso, then picks Iso-H. Top and Side must draw the same
    grid as in Iso. Front must draw all 8 rank slices (200 squares, rank 8
    first), separate, left to right along a +20 degree axis, each an Iso
    slice, the selected rank's 1.7x as wide as the others, with every piece
    on the board; subtitle above them, plane picker right of them and left of
-   the separator (screenshot `screenshot-front-isox.png`). It hovers the
+   the separator (screenshot `screenshot-front-isoh.png`). It hovers the
    middle of rank 7's (small) slice and confirms it pops out into
    `#front-hover` (drawn last): 25 squares, 1.7x its unhovered width around
    the same center, with its pieces, while the other 175 squares, the
    subtitle, the plane picker and the display state stay put
-   (`screenshot-front-isox-hover.png`); hovers rank 1's slice (right end)
+   (`screenshot-front-isoh-hover.png`); hovers rank 1's slice (right end)
    and confirms it pops out 1.7x but stays left of the plane picker; then
    moves the mouse off the slices and confirms the unhovered layout is
    back. (After each slice click the driver moves the mouse off the
@@ -148,7 +152,7 @@ CWD. It:
    middle square of rank 5's (small) slice and confirms only the rank
    changed (2,5,1) and rank 5's slice is now the large one, then clicks the
    same square again (now in the large slice) and confirms 3,5,3 is
-   selected (`screenshot-front-isox-rank5.png`), then
+   selected (`screenshot-front-isoh-rank5.png`), then
    restores rank 8 and the carried cell. Then picks Basic and confirms the grid is square
    again. Finally clicks "Cube
    View" and confirms only `#cube` is shown, the cell is still 2,8,1, the
@@ -180,7 +184,7 @@ cell display (black Triton at 2,8,1): {"coords":"2, 8, 1",...,"color":"BLACK","l
 widget column: centers cell display 1180.2, row 1180.2, indicator cube 1180.1; diag toggle center y 500.2 (page 500); overlaps []
 separator: {"x":982.8,"top":101.1,"bottom":898.9,"stroke":"rgba(255,255,255,0.25)","width":"1","cubeRight":960.3}; widget column left 1005.3
 view option: gap to view mode picker 15.0, center y 500.0 (diag toggle 500.2)
-view mode picker: {"caption":"View Mode","options":"Basic,Iso,Iso-X","selected":"Basic","gap":15.0,"centerY":500.0,"diagCenterY":500.2}
+view mode picker: {"caption":"View Mode","options":"Basic,Iso,Iso-H","selected":"Basic","gap":15.0,"centerY":500.0,"diagCenterY":500.2}
 view mode iso: selected Iso; cube shown true; widgets unmoved true
 view mode after view changes: front Iso, cube Iso
 front: display {"cube":"none","front-view":"inline","side-view":"none","top-view":"none","not-implemented":"none"}
@@ -194,14 +198,14 @@ front diag overlay: none -> inline; 25 squares; colors #b34100 | #178217 | #b300
 front iso: row line -20.00 deg (want -20), column line dx 0.00; subtitle bottom 238.6, grid top 248.6; grid right 678.7, picker left 712.4; 25 pieces
 front iso after clicking square 4,3: widgets level 3, rank 8, file 4, diag ON
 front iso after clicking the carried cell: widgets level 2, rank 8, file 1, diag ON
-front iso-x (rank 8 selected): 200 squares in 8 slices; widths 137.7 81.0 81.0 81.0 81.0 81.0 81.0 81.0 (selected/other 1.700); separate true; axis 20.00 deg; slice tilts ok true; 100 pieces (cube 100); subtitle bottom 276.2 vs top 286.2; slices right 877.7, picker 900.2..959.8, separator 982.8
-front iso-x hovering rank 7: 175 base + 25 popped-out squares; width ratio 1.700; center moved 0.00,-0.00; others fixed true; 25 popped-out pieces; drawn last front-hover; subtitle/picker fixed true
-front iso-x while hovering rank 7: widgets level 2, rank 8, file 1, diag ON
-front iso-x hovering rank 1: width ratio 1.700; right edge 251.7 vs picker 272.7
-front iso-x after the hover: 200 base + 0 popped-out squares; layout restored true
-front iso-x after clicking rank 5's (small) slice: widgets level 2, rank 5, file 1, diag ON
-front iso-x (rank 5 selected): 200 squares in 8 slices; widths 81.0 81.0 81.0 137.6 81.0 81.0 81.0 81.0 (selected/other 1.700); ...
-front iso-x after clicking rank 5's (large) slice: widgets level 3, rank 5, file 3, diag ON
+front iso-h (rank 8 selected): 200 squares in 8 slices; widths 137.7 81.0 81.0 81.0 81.0 81.0 81.0 81.0 (selected/other 1.700); separate true; axis 20.00 deg; slice tilts ok true; 100 pieces (cube 100); subtitle bottom 276.2 vs top 286.2; slices right 877.7, picker 900.2..959.8, separator 982.8
+front iso-h hovering rank 7: 175 base + 25 popped-out squares; width ratio 1.700; center moved 0.00,-0.00; others fixed true; 25 popped-out pieces; drawn last front-hover; subtitle/picker fixed true
+front iso-h while hovering rank 7: widgets level 2, rank 8, file 1, diag ON
+front iso-h hovering rank 1: width ratio 1.700; right edge 251.7 vs picker 272.7
+front iso-h after the hover: 200 base + 0 popped-out squares; layout restored true
+front iso-h after clicking rank 5's (small) slice: widgets level 2, rank 5, file 1, diag ON
+front iso-h (rank 5 selected): 200 squares in 8 slices; widths 81.0 81.0 81.0 137.6 81.0 81.0 81.0 81.0 (selected/other 1.700); ...
+front iso-h after clicking rank 5's (large) slice: widgets level 3, rank 5, file 3, diag ON
 front back in iso, carried cell restored: widgets level 2, rank 8, file 1, diag ON
 top: ... (40 cells, 20 pieces; level 2)
 side: ... (40 cells, 20 pieces; file 1)

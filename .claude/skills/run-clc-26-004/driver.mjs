@@ -310,7 +310,7 @@ try {
   }
 
   // The view mode picker sits just left of the diag toggle, centered on the
-  // same height, captioned "View Mode", offering Basic, Iso and Iso-X with
+  // same height, captioned "View Mode", offering Basic, Iso and Iso-H with
   // Basic selected. Picking Iso highlights it
   // without changing the view shown or moving any widget (Iso draws the
   // same as Basic for now) and keeps it across view changes; picking Basic
@@ -329,9 +329,9 @@ try {
   });
   const mode = await modeInfo();
   console.log(`view mode picker: ${JSON.stringify(mode)}`);
-  if (mode.caption !== "View Mode" || mode.options !== "Basic,Iso,Iso-X" || mode.selected !== "Basic"
+  if (mode.caption !== "View Mode" || mode.options !== "Basic,Iso,Iso-H" || mode.selected !== "Basic"
       || mode.gap <= 0 || mode.gap > 30 || Math.abs(mode.centerY - mode.diagCenterY) > 5) {
-    console.error("FAIL: view mode picker should be captioned View Mode, offer Basic,Iso,Iso-X with Basic selected, and sit just left of the diag toggle at the same height");
+    console.error("FAIL: view mode picker should be captioned View Mode, offer Basic,Iso,Iso-H with Basic selected, and sit just left of the diag toggle at the same height");
     exitCode = 1;
   }
   const modeBoxesBefore = await widgetBoxes();
@@ -634,7 +634,8 @@ try {
     await checkState(`${prefix} iso after clicking square ${clickAt.col},${clickAt.row}`, { ...expected, ...clickAt.cell });
     await clickSquare(prefix, cols, carriedAt.col, carriedAt.row);
     await checkState(`${prefix} iso after clicking the carried cell`, expected);
-    // Iso-X: Top and Side draw the same as in Iso. Front draws all 8 rank
+    // Iso-H (the isopop branch's name for its changes and experiments; Iso-X
+    // on main): Top and Side draw the same as in Iso. Front draws all 8 rank
     // slices (25 squares each, rank 8 first), left to right along an axis
     // tilted 20 degrees clockwise (down to the right), not touching, each an
     // Iso slice (row lines -20 degrees, column lines vertical), the selected
@@ -644,12 +645,12 @@ try {
     // (the cell's level and file stay), making its slice the large one;
     // clicking a square in the large slice selects that cell. Hovering a
     // small slice pops it out (see the hover checks below).
-    await page.locator('#view-mode-picker [data-value="isoX"]').click();
-    const isoX = await gridShape();
+    await page.locator('#view-mode-picker [data-value="isoH"]').click();
+    const isoH = await gridShape();
     if (prefix !== "front") {
-      console.log(`${prefix} iso-x: same grid as iso ${isoX.points === iso.points}; ${isoX.pieces} pieces`);
-      if (isoX.points !== iso.points || isoX.pieces !== iso.pieces) {
-        console.error(`FAIL: ${label} in Iso-X should draw the same as in Iso`);
+      console.log(`${prefix} iso-h: same grid as iso ${isoH.points === iso.points}; ${isoH.pieces} pieces`);
+      if (isoH.points !== iso.points || isoH.pieces !== iso.pieces) {
+        console.error(`FAIL: ${label} in Iso-H should draw the same as in Iso`);
         exitCode = 1;
       }
     } else {
@@ -691,17 +692,17 @@ try {
         // close.
         const tilts = x.slices.every((sl) => Math.abs(sl.rowLine + 20) < 0.1 && Math.abs(sl.colLineDx) < 0.02);
         const equalOthers = others.every((w) => Math.abs(w - others[0]) < 0.5);
-        console.log(`front iso-x (${name}): ${x.squares} squares in ${x.slices.length} slices; widths ${widths.map((w) => w.toFixed(1)).join(" ")} (selected/other ${ratio.toFixed(3)}); separate ${ordered}; axis ${axisDeg.toFixed(2)} deg; slice tilts ok ${tilts}; ${x.pieces} pieces (cube ${totalPieces}); subtitle bottom ${x.subtitleBottom.toFixed(1)} vs top ${x.checkersTop.toFixed(1)}; slices right ${x.checkersRight.toFixed(1)}, picker ${x.pickerLeft.toFixed(1)}..${x.pickerRight.toFixed(1)}, separator ${x.sepX.toFixed(1)}`);
+        console.log(`front iso-h (${name}): ${x.squares} squares in ${x.slices.length} slices; widths ${widths.map((w) => w.toFixed(1)).join(" ")} (selected/other ${ratio.toFixed(3)}); separate ${ordered}; axis ${axisDeg.toFixed(2)} deg; slice tilts ok ${tilts}; ${x.pieces} pieces (cube ${totalPieces}); subtitle bottom ${x.subtitleBottom.toFixed(1)} vs top ${x.checkersTop.toFixed(1)}; slices right ${x.checkersRight.toFixed(1)}, picker ${x.pickerLeft.toFixed(1)}..${x.pickerRight.toFixed(1)}, separator ${x.sepX.toFixed(1)}`);
         if (x.squares !== 200 || x.slices.length !== 8 || Math.abs(ratio - 1.7) > 0.02 || !equalOthers || !ordered
             || Math.abs(axisDeg - 20) > 1 || !tilts || x.pieces !== totalPieces || !(x.subtitleBottom <= x.checkersTop)
             || !(x.checkersRight < x.pickerLeft) || !(x.pickerRight < x.sepX)) {
-          console.error(`FAIL: Front View in Iso-X (${name}) should show 8 separate Iso rank slices, rank 8 first, along a +20 degree axis, rank ${selectedRank}'s 1.7x the others, all pieces, subtitle above, plane picker between the slices and the separator`);
+          console.error(`FAIL: Front View in Iso-H (${name}) should show 8 separate Iso rank slices, rank 8 first, along a +20 degree axis, rank ${selectedRank}'s 1.7x the others, all pieces, subtitle above, plane picker between the slices and the separator`);
           exitCode = 1;
         }
       };
       await checkExploded(CARRIED.rank, `rank ${CARRIED.rank} selected`);
-      await page.screenshot({ path: path.join(outDir, "screenshot-front-isox.png") });
-      console.log(`screenshot: ${path.join(outDir, "screenshot-front-isox.png")}`);
+      await page.screenshot({ path: path.join(outDir, "screenshot-front-isoh.png") });
+      console.log(`screenshot: ${path.join(outDir, "screenshot-front-isoh.png")}`);
       // The screen point of the middle square (file 3, level 3) of the slice
       // at index `i` (rank 8 - i): square index i * 25 + 2 * 5 + 2.
       const middleOf = (i) => page.evaluate((i) => {
@@ -762,20 +763,20 @@ try {
           const expectedNow = [...was.slice(0, 25), ...was.slice(50)];
           return now.join("|") === expectedNow.join("|");
         })();
-        console.log(`front iso-x hovering rank 7: ${h.baseSquares} base + ${h.hoverSquares} popped-out squares; width ratio ${ratio.toFixed(3)}; center moved ${dCx.toFixed(2)},${dCy.toFixed(2)}; others fixed ${othersFixed}; ${h.hoverPieces} popped-out pieces; drawn last ${h.hoverLast}; subtitle/picker fixed ${h.subtitle === before.subtitle && h.picker === before.picker}`);
+        console.log(`front iso-h hovering rank 7: ${h.baseSquares} base + ${h.hoverSquares} popped-out squares; width ratio ${ratio.toFixed(3)}; center moved ${dCx.toFixed(2)},${dCy.toFixed(2)}; others fixed ${othersFixed}; ${h.hoverPieces} popped-out pieces; drawn last ${h.hoverLast}; subtitle/picker fixed ${h.subtitle === before.subtitle && h.picker === before.picker}`);
         if (h.baseSquares !== 175 || h.hoverSquares !== 25 || Math.abs(ratio - 1.7) > 0.02
             || Math.abs(dCx) > 0.5 || Math.abs(dCy) > 0.5 || !othersFixed || h.hoverPieces === 0 || h.hoverLast !== "front-hover"
             || h.subtitle !== before.subtitle || h.picker !== before.picker) {
           console.error("FAIL: hovering rank 7's slice should pop it out 1.7x in place, on top, without moving anything else");
           exitCode = 1;
         }
-        await page.screenshot({ path: path.join(outDir, "screenshot-front-isox-hover.png") });
-        console.log(`screenshot: ${path.join(outDir, "screenshot-front-isox-hover.png")}`);
-        await checkState("front iso-x while hovering rank 7", expected);
+        await page.screenshot({ path: path.join(outDir, "screenshot-front-isoh-hover.png") });
+        console.log(`screenshot: ${path.join(outDir, "screenshot-front-isoh-hover.png")}`);
+        await checkState("front iso-h while hovering rank 7", expected);
       }
       {
         const { h, ratio } = await hoverAt(7);
-        console.log(`front iso-x hovering rank 1: width ratio ${ratio.toFixed(3)}; right edge ${h.maxX.toFixed(1)} vs picker ${h.pickerLeftUser.toFixed(1)}`);
+        console.log(`front iso-h hovering rank 1: width ratio ${ratio.toFixed(3)}; right edge ${h.maxX.toFixed(1)} vs picker ${h.pickerLeftUser.toFixed(1)}`);
         if (h.hoverSquares !== 25 || Math.abs(ratio - 1.7) > 0.02 || !(h.maxX < h.pickerLeftUser)) {
           console.error("FAIL: hovering rank 1's slice should pop it out 1.7x, kept left of the plane picker");
           exitCode = 1;
@@ -784,7 +785,7 @@ try {
       await mouseAway();
       {
         const h = await hoverShape();
-        console.log(`front iso-x after the hover: ${h.baseSquares} base + ${h.hoverSquares} popped-out squares; layout restored ${h.base === before.base}`);
+        console.log(`front iso-h after the hover: ${h.baseSquares} base + ${h.hoverSquares} popped-out squares; layout restored ${h.base === before.base}`);
         if (h.baseSquares !== 200 || h.hoverSquares !== 0 || h.base !== before.base) {
           console.error("FAIL: moving off the slices should restore the unhovered layout");
           exitCode = 1;
@@ -797,12 +798,12 @@ try {
         await mouseAway();
       };
       await clickMiddle(3);
-      await checkState("front iso-x after clicking rank 5's (small) slice", { ...expected, rank: 5 });
+      await checkState("front iso-h after clicking rank 5's (small) slice", { ...expected, rank: 5 });
       await checkExploded(5, "rank 5 selected");
       await clickMiddle(3);
-      await checkState("front iso-x after clicking rank 5's (large) slice", { ...expected, level: 3, rank: 5, file: 3 });
-      await page.screenshot({ path: path.join(outDir, "screenshot-front-isox-rank5.png") });
-      console.log(`screenshot: ${path.join(outDir, "screenshot-front-isox-rank5.png")}`);
+      await checkState("front iso-h after clicking rank 5's (large) slice", { ...expected, level: 3, rank: 5, file: 3 });
+      await page.screenshot({ path: path.join(outDir, "screenshot-front-isoh-rank5.png") });
+      console.log(`screenshot: ${path.join(outDir, "screenshot-front-isoh-rank5.png")}`);
       await page.locator('#front-plane-picker [data-value="8"]').click();
       await page.locator('#view-mode-picker [data-value="iso"]').click();
       await clickSquare(prefix, cols, carriedAt.col, carriedAt.row);

@@ -13,10 +13,12 @@ import { TEXT_STYLE, makePanelRect, makeHitRect, emitDisplayChange } from './wid
 // is clicked. setValue updates the shown option from outside (e.g. when a
 // view change resets displayState) without firing an event. Option ids are
 // ViewModes (see displayState.ts).
+// Iso-H is the name, in the isopop branch, for the changes and experiments
+// introduced there (on main the mode is Iso-X, without them).
 const OPTIONS = [
   { id: "basic", label: "Basic" },
   { id: "iso", label: "Iso" },
-  { id: "isoX", label: "Iso-X" },
+  { id: "isoH", label: "Iso-H" },
 ];
 const CAPTION = "View Mode";
 

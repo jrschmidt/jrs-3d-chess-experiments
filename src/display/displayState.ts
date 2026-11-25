@@ -9,9 +9,11 @@ export type LevelValue = null | 1 | 2 | 3 | 4 | 5;
 export type RankValue = null | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8;
 export type FileValue = null | 1 | 2 | 3 | 4 | 5;
 // How the views are drawn. 'iso' tilts the Front and Side slice views (see
-// drawSlice.ts) and otherwise draws like 'basic'; 'isoX' is 'iso' plus an
+// drawSlice.ts) and otherwise draws like 'basic'; 'isoH' is 'iso' plus an
 // exploded Front View (every rank at once).
-export type ViewMode = 'basic' | 'iso' | 'isoX';
+// Iso-H is the name, in the isopop branch, for the changes and experiments
+// introduced there (on main the mode is Iso-X, without them).
+export type ViewMode = 'basic' | 'iso' | 'isoH';
 // Which cell-visibility rule (see cellVisibility.ts) is in effect.
 export type CellVisibilityOption = 'all';
 

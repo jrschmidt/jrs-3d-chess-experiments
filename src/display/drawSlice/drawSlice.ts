@@ -24,13 +24,13 @@ import {
 // `planeField` (with its caption and maximum) is the field the view's plane
 // picker changes.
 //
-// In the Iso view modes (Iso and Iso-X), a view with an `isoColStep` draws
+// In the Iso view modes (Iso and Iso-H), a view with an `isoColStep` draws
 // its columns along that screen direction instead of straight right: the
 // rows' lines tilt TILT_DEGREES, as on the matching face of the cube, while
 // the columns' lines stay vertical. Views without one (top) draw the same in
 // every mode.
 //
-// In Iso-X, a view with `isoXExplode` (front) draws every plane at once,
+// In Iso-H, a view with `isoHExplode` (front) draws every plane at once,
 // each as its Iso slice, spread along `axis` from plane planeMax at the
 // left to plane 1 at the right, not touching. The selected plane's slice is
 // EXPLODE_SELECTED_SCALE times the size of the others, which shrink so the
@@ -39,7 +39,10 @@ import {
 // slice's plane. While the cursor is over one of the small slices, that
 // slice pops out: it grows to the selected slice's size around its own
 // center (nudged inward at the ends of the row) and is drawn on top of its
-// neighbors; nothing else moves. Otherwise Iso-X draws like Iso.
+// neighbors; nothing else moves. Otherwise Iso-H draws like Iso.
+//
+// Iso-H is the name, in the isopop branch, for the changes and experiments
+// introduced there (on main the mode is Iso-X, without them). The hover pop-out is the first of them.
 const TILT_RAD = TILT_DEGREES * Math.PI / 180;
 const EXPLODE_SELECTED_SCALE = 1.7;
 const EXPLODE_GAP = PITCH * 0.15;
@@ -54,7 +57,7 @@ const SLICE_VIEWS = {
     isoColStep: { x: Math.cos(TILT_RAD), y: -Math.sin(TILT_RAD) },
     // Ranks 8..1 down and to the right (tilted clockwise), like the cube's
     // rank axis reversed: rank 8 at the back, rank 1 at the front.
-    isoXExplode: { axis: { x: Math.cos(TILT_RAD), y: Math.sin(TILT_RAD) } },
+    isoHExplode: { axis: { x: Math.cos(TILT_RAD), y: Math.sin(TILT_RAD) } },
   },
   // The focus file, seen from outside it (white's left): rank 8 at the left
   // and rank 1 at the right, as on the cube's visible file-1 face.
@@ -105,8 +108,8 @@ const forEachSliceSquare = (config, fn) => {
 
 // Builds one slice view, centered on the cube's bbox (pass it before the
 // widgets are merged in), which it fits inside, so it doesn't extend the
-// bbox. layout places the slices for the view mode (one, or in Iso-X with
-// `isoXExplode`, all of them); refresh colors the squares, draws the pieces
+// bbox. layout places the slices for the view mode (one, or in Iso-H with
+// `isoHExplode`, all of them); refresh colors the squares, draws the pieces
 // and highlights the focus level. Returns a ViewController (see
 // viewController.ts).
 const buildSliceView = (config, bbox, state) => {
@@ -122,7 +125,7 @@ const buildSliceView = (config, bbox, state) => {
   let hovered = null;
   let lastState = state;
 
-  const exploded = (mode) => mode === "isoX" && Boolean(config.isoXExplode);
+  const exploded = (mode) => mode === "isoH" && Boolean(config.isoHExplode);
   // The slice that pops out: the hovered one, unless it's already large.
   const effectiveHover = (mode, selected) =>
     exploded(mode) && hovered !== selected ? hovered : null;
@@ -210,7 +213,7 @@ const buildSliceView = (config, bbox, state) => {
   // shifted just enough to stay inside that width.
   const placedSlices = (mode, selected, hover) => {
     if (!exploded(mode)) return { slices: [{ plane: null, center, scale: 1 }], hoverSlice: null };
-    const { axis } = config.isoXExplode;
+    const { axis } = config.isoHExplode;
     const planes = Array.from({ length: config.planeMax }, (_, i) => config.planeMax - i);
     const availMinX = bbox.minX;
     const availMaxX = bbox.maxX - (planePicker.maxX - planePicker.minX) - pickerGap;
