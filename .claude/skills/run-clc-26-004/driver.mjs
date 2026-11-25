@@ -310,8 +310,8 @@ try {
   }
 
   // The view mode picker sits just left of the diag toggle, centered on the
-  // same height, captioned "View Mode", offering Basic and Iso (Iso-X is
-  // commented out for now) with Basic selected. Picking Iso highlights it
+  // same height, captioned "View Mode", offering Basic, Iso and Iso-X with
+  // Basic selected. Picking Iso highlights it
   // without changing the view shown or moving any widget (Iso draws the
   // same as Basic for now) and keeps it across view changes; picking Basic
   // puts it back.
@@ -329,9 +329,9 @@ try {
   });
   const mode = await modeInfo();
   console.log(`view mode picker: ${JSON.stringify(mode)}`);
-  if (mode.caption !== "View Mode" || mode.options !== "Basic,Iso" || mode.selected !== "Basic"
+  if (mode.caption !== "View Mode" || mode.options !== "Basic,Iso,Iso-X" || mode.selected !== "Basic"
       || mode.gap <= 0 || mode.gap > 30 || Math.abs(mode.centerY - mode.diagCenterY) > 5) {
-    console.error("FAIL: view mode picker should be captioned View Mode, offer Basic,Iso with Basic selected, and sit just left of the diag toggle at the same height");
+    console.error("FAIL: view mode picker should be captioned View Mode, offer Basic,Iso,Iso-X with Basic selected, and sit just left of the diag toggle at the same height");
     exitCode = 1;
   }
   const modeBoxesBefore = await widgetBoxes();
@@ -615,6 +615,8 @@ try {
         titleBottom: box(`${prefix}-subtitle`).bottom, gridTop: box(`${prefix}-checkers`).top,
         gridRight: box(`${prefix}-checkers`).right, pickerLeft: box(`${prefix}-plane-picker`).left,
         pieces: document.querySelectorAll(`#${prefix}-pieces > g`).length,
+        points: [...document.querySelectorAll(`#${prefix}-checkers polygon, #${prefix}-diag-squares polygon`)]
+          .map((p) => p.getAttribute("points")).join(" | "),
       };
     }, prefix);
     const wantTilt = { front: -20, side: 20, top: 0 }[prefix];
@@ -632,6 +634,94 @@ try {
     await checkState(`${prefix} iso after clicking square ${clickAt.col},${clickAt.row}`, { ...expected, ...clickAt.cell });
     await clickSquare(prefix, cols, carriedAt.col, carriedAt.row);
     await checkState(`${prefix} iso after clicking the carried cell`, expected);
+    // Iso-X: Top and Side draw the same as in Iso. Front draws all 8 rank
+    // slices (25 squares each, rank 8 first), left to right along an axis
+    // tilted 20 degrees clockwise (down to the right), not touching, each an
+    // Iso slice (row lines -20 degrees, column lines vertical), the selected
+    // rank's 1.7 times as wide as the others, with every rank's pieces; the
+    // subtitle above them and the plane picker right of them, left of the
+    // separator. Clicking a square in another slice selects only that rank
+    // (the cell's level and file stay), making its slice the large one;
+    // clicking a square in the large slice selects that cell.
+    await page.locator('#view-mode-picker [data-value="isoX"]').click();
+    const isoX = await gridShape();
+    if (prefix !== "front") {
+      console.log(`${prefix} iso-x: same grid as iso ${isoX.points === iso.points}; ${isoX.pieces} pieces`);
+      if (isoX.points !== iso.points || isoX.pieces !== iso.pieces) {
+        console.error(`FAIL: ${label} in Iso-X should draw the same as in Iso`);
+        exitCode = 1;
+      }
+    } else {
+      const exploded = () => page.evaluate(() => {
+        const polys = [...document.querySelectorAll("#front-checkers polygon")];
+        const pts = polys.map((p) => p.getAttribute("points").split(" ").map((q) => q.split(",").map(Number)));
+        const deg = ([x0, y0], [x1, y1]) => Math.atan2(y1 - y0, x1 - x0) * 180 / Math.PI;
+        const slices = [];
+        for (let i = 0; i < pts.length; i += 25) {
+          const all = pts.slice(i, i + 25).flat();
+          const xs = all.map((q) => q[0]), ys = all.map((q) => q[1]);
+          slices.push({
+            minX: Math.min(...xs), maxX: Math.max(...xs), minY: Math.min(...ys), maxY: Math.max(...ys),
+            cx: (Math.min(...xs) + Math.max(...xs)) / 2, cy: (Math.min(...ys) + Math.max(...ys)) / 2,
+            rowLine: deg(pts[i][0], pts[i][1]), colLineDx: pts[i][3][0] - pts[i][0][0],
+          });
+        }
+        const box = (id) => document.getElementById(id).getBoundingClientRect();
+        const ctm = document.getElementById("front-checkers").getScreenCTM();
+        return {
+          squares: polys.length, slices,
+          pieces: document.querySelectorAll("#front-pieces > g").length,
+          subtitleBottom: box("front-subtitle").bottom, checkersTop: box("front-checkers").top,
+          checkersRight: box("front-checkers").right, pickerLeft: box("front-plane-picker").left,
+          pickerRight: box("front-plane-picker").right, sepX: box("widget-separator").left,
+          scale: ctm.a,
+        };
+      });
+      const totalPieces = await page.evaluate(() => document.querySelectorAll("#cube > g[transform]").length);
+      const checkExploded = async (selectedRank, name) => {
+        const x = await exploded();
+        const widths = x.slices.map((sl) => sl.maxX - sl.minX);
+        const selIdx = 8 - selectedRank;
+        const others = widths.filter((_, i) => i !== selIdx);
+        const ratio = widths[selIdx] / others[0];
+        const ordered = x.slices.every((sl, i) => i === 0 || sl.minX > x.slices[i - 1].maxX);
+        const axisDeg = Math.atan2(x.slices[7].cy - x.slices[0].cy, x.slices[7].cx - x.slices[0].cx) * 180 / Math.PI;
+        // Points are rounded to 0.01, so the small slices' angles are only that
+        // close.
+        const tilts = x.slices.every((sl) => Math.abs(sl.rowLine + 20) < 0.1 && Math.abs(sl.colLineDx) < 0.02);
+        const equalOthers = others.every((w) => Math.abs(w - others[0]) < 0.5);
+        console.log(`front iso-x (${name}): ${x.squares} squares in ${x.slices.length} slices; widths ${widths.map((w) => w.toFixed(1)).join(" ")} (selected/other ${ratio.toFixed(3)}); separate ${ordered}; axis ${axisDeg.toFixed(2)} deg; slice tilts ok ${tilts}; ${x.pieces} pieces (cube ${totalPieces}); subtitle bottom ${x.subtitleBottom.toFixed(1)} vs top ${x.checkersTop.toFixed(1)}; slices right ${x.checkersRight.toFixed(1)}, picker ${x.pickerLeft.toFixed(1)}..${x.pickerRight.toFixed(1)}, separator ${x.sepX.toFixed(1)}`);
+        if (x.squares !== 200 || x.slices.length !== 8 || Math.abs(ratio - 1.7) > 0.02 || !equalOthers || !ordered
+            || Math.abs(axisDeg - 20) > 1 || !tilts || x.pieces !== totalPieces || !(x.subtitleBottom <= x.checkersTop)
+            || !(x.checkersRight < x.pickerLeft) || !(x.pickerRight < x.sepX)) {
+          console.error(`FAIL: Front View in Iso-X (${name}) should show 8 separate Iso rank slices, rank 8 first, along a +20 degree axis, rank ${selectedRank}'s 1.7x the others, all pieces, subtitle above, plane picker between the slices and the separator`);
+          exitCode = 1;
+        }
+      };
+      await checkExploded(CARRIED.rank, `rank ${CARRIED.rank} selected`);
+      await page.screenshot({ path: path.join(outDir, "screenshot-front-isox.png") });
+      console.log(`screenshot: ${path.join(outDir, "screenshot-front-isox.png")}`);
+      // Clicks the middle square (file 3, level 3) of the slice at index
+      // `i` (rank 8 - i): square index i * 25 + 2 * 5 + 2.
+      const clickMiddle = async (i) => {
+        const target = await page.evaluate((i) => {
+          const r = document.querySelectorAll("#front-checkers polygon")[i * 25 + 12].getBoundingClientRect();
+          return { x: r.x + r.width / 2, y: r.y + r.height / 2 };
+        }, i);
+        await page.mouse.click(target.x, target.y);
+      };
+      await clickMiddle(3);
+      await checkState("front iso-x after clicking rank 5's (small) slice", { ...expected, rank: 5 });
+      await checkExploded(5, "rank 5 selected");
+      await clickMiddle(3);
+      await checkState("front iso-x after clicking rank 5's (large) slice", { ...expected, level: 3, rank: 5, file: 3 });
+      await page.screenshot({ path: path.join(outDir, "screenshot-front-isox-rank5.png") });
+      console.log(`screenshot: ${path.join(outDir, "screenshot-front-isox-rank5.png")}`);
+      await page.locator('#front-plane-picker [data-value="8"]').click();
+      await page.locator('#view-mode-picker [data-value="iso"]').click();
+      await clickSquare(prefix, cols, carriedAt.col, carriedAt.row);
+      await checkState("front back in iso, carried cell restored", expected);
+    }
     await page.locator('#view-mode-picker [data-value="basic"]').click();
     const basic = await gridShape();
     if (Math.abs(basic.rowLine) > 0.01 || Math.abs(basic.colLineDx) > 0.01) {

@@ -24,11 +24,22 @@ import {
 // `planeField` (with its caption and maximum) is the field the view's plane
 // picker changes.
 //
-// In the Iso view modes, a view with an `isoColStep` draws its columns along
-// that screen direction instead of straight right: the rows' lines tilt
-// TILT_DEGREES, as on the matching face of the cube, while the columns'
-// lines stay vertical. Views without one (top) draw the same in every mode.
+// In the Iso view modes (Iso and Iso-X), a view with an `isoColStep` draws
+// its columns along that screen direction instead of straight right: the
+// rows' lines tilt TILT_DEGREES, as on the matching face of the cube, while
+// the columns' lines stay vertical. Views without one (top) draw the same in
+// every mode.
+//
+// In Iso-X, a view with `isoXExplode` (front) draws every plane at once,
+// each as its Iso slice, spread along `axis` from plane planeMax at the
+// left to plane 1 at the right, not touching. The selected plane's slice is
+// EXPLODE_SELECTED_SCALE times the size of the others, which shrink so the
+// whole set fits left of the plane picker. Clicking a square in the
+// selected slice selects its cell; in any other slice it selects only that
+// slice's plane. Otherwise Iso-X draws like Iso.
 const TILT_RAD = TILT_DEGREES * Math.PI / 180;
+const EXPLODE_SELECTED_SCALE = 1.7;
+const EXPLODE_GAP = PITCH * 0.15;
 const SLICE_VIEWS = {
   // The focus rank, seen from in front of it (white's side).
   "front-white": {
@@ -38,6 +49,9 @@ const SLICE_VIEWS = {
     cellAt: (col, row, rank) => ({ rank, level: row, file: col }),
     // Up and to the right (tilted counterclockwise), like the cube's file axis.
     isoColStep: { x: Math.cos(TILT_RAD), y: -Math.sin(TILT_RAD) },
+    // Ranks 8..1 down and to the right (tilted clockwise), like the cube's
+    // rank axis reversed: rank 8 at the back, rank 1 at the front.
+    isoXExplode: { axis: { x: Math.cos(TILT_RAD), y: Math.sin(TILT_RAD) } },
   },
   // The focus file, seen from outside it (white's left): rank 8 at the left
   // and rank 1 at the right, as on the cube's visible file-1 face.
@@ -88,98 +102,62 @@ const forEachSliceSquare = (config, fn) => {
 
 // Builds one slice view, centered on the cube's bbox (pass it before the
 // widgets are merged in), which it fits inside, so it doesn't extend the
-// bbox. Only the geometry is built here; refresh colors the squares, draws
-// the pieces and highlights the focus level for the plane shown. Returns a
-// ViewController (see viewController.ts).
+// bbox. layout places the slices for the view mode (one, or in Iso-X with
+// `isoXExplode`, all of them); refresh colors the squares, draws the pieces
+// and highlights the focus level. Returns a ViewController (see
+// viewController.ts).
 const buildSliceView = (config, bbox, state) => {
   const center = { x: (bbox.minX + bbox.maxX) / 2, y: (bbox.minY + bbox.maxY) / 2 };
   const el = svgEl("g", { id: config.id, display: "none" });
-  // The plane on screen, and the view mode the grid is laid out for, as of
-  // the last refresh.
+  // The plane on screen, and the layout key (see layoutKey) the slices are
+  // laid out for, as of the last refresh.
   let plane = config.plane(state);
-  let viewMode = state.viewMode;
+  let laidOutFor = null;
 
-  // The grid's steps for the current view mode (see layout), and the screen
-  // point at grid position (col, row), centered on `center`. Square (col,
-  // row) is centered on whole numbers; its corners are at the halves.
-  let steps = gridSteps(config, viewMode);
-  const gridPoint = (col, row) => {
-    const c = col - (config.cols + 1) / 2, r = row - (config.rows + 1) / 2;
+  const exploded = (mode) => mode === "isoX" && Boolean(config.isoXExplode);
+  // The slices only move when the view mode changes, or, exploded, when
+  // the selected plane (the large slice) does.
+  const layoutKey = (mode, p) => exploded(mode) ? `${mode}|${p}` : mode;
+
+  // The grid's unscaled steps for the current view mode (see layout). A
+  // placed slice is { plane, center, scale }; its plane is null when it
+  // shows whatever plane is selected (the single-slice layouts). gridPoint
+  // is the screen point at grid position (col, row) of a slice: square
+  // (col, row) is centered on whole numbers, its corners on the halves.
+  let steps = gridSteps(config, state.viewMode);
+  const gridPoint = (slice, col, row) => {
+    const c = (col - (config.cols + 1) / 2) * slice.scale, r = (row - (config.rows + 1) / 2) * slice.scale;
     return {
-      x: center.x + c * steps.col.x + r * steps.row.x,
-      y: center.y + c * steps.col.y + r * steps.row.y,
+      x: slice.center.x + c * steps.col.x + r * steps.row.x,
+      y: slice.center.y + c * steps.col.y + r * steps.row.y,
     };
   };
-  const squareCorners = (col, row, k = 1) => [[-1, -1], [1, -1], [1, 1], [-1, 1]]
-    .map(([dc, dr]) => gridPoint(col + dc * k / 2, row + dr * k / 2));
+  const squareCorners = (slice, col, row, k = 1) => [[-1, -1], [1, -1], [1, 1], [-1, 1]]
+    .map(([dc, dr]) => gridPoint(slice, col + dc * k / 2, row + dr * k / 2));
+  const left = 0.5, right = config.cols + 0.5, bottom = 0.5, top = config.rows + 0.5;
+  const outerCorners = (slice) => [
+    gridPoint(slice, left, bottom), gridPoint(slice, right, bottom),
+    gridPoint(slice, right, top), gridPoint(slice, left, top),
+  ];
+  const planeOf = (slice) => slice.plane ?? plane;
 
-  // Each square's checker and diag square (inset as in the cube). Only the
-  // checkers take clicks; the diag squares, frame and pieces drawn over
+  // Each square's checker and diag square (inset as in the cube), the
+  // frames and the pieces, filled in by layout and refresh. Only the
+  // checkers take clicks; the diag squares, frames and pieces drawn over
   // them pass clicks through.
   const checkerGroup = svgEl("g", { id: `${config.prefix}-checkers` });
   const diagGroup = svgEl("g", {
     id: `${config.prefix}-diag-squares`, display: state.show3dDiagonals ? "inline" : "none",
     "pointer-events": "none",
   });
-  const squares = [];
-  forEachSliceSquare(config, (col, row) => {
-    const checkerEl = svgEl("polygon", { style: "cursor: pointer" });
-    // Clicking a square selects its cell in the plane on screen: one
-    // display-change per field, handled like the cell indicator cube's.
-    checkerEl.addEventListener("click", () => {
-      const { level, rank, file } = config.cellAt(col, row, plane);
-      emitDisplayChange(checkerEl, "level", level);
-      emitDisplayChange(checkerEl, "rank", rank);
-      emitDisplayChange(checkerEl, "file", file);
-    });
-    checkerGroup.appendChild(checkerEl);
-    const diagEl = svgEl("polygon", {
-      fill: "none",
-      "stroke-width": DIAG_SQUARE_STROKE_WIDTH,
-    });
-    diagGroup.appendChild(diagEl);
-    squares.push({ col, row, checkerEl, diagEl });
-  });
+  const frameGroup = svgEl("g", { id: `${config.prefix}-frame`, "pointer-events": "none" });
+  const piecesEl = svgEl("g", { id: `${config.prefix}-pieces`, "pointer-events": "none" });
   el.appendChild(checkerGroup);
   el.appendChild(diagGroup);
-
-  // The frame. With rows as levels: the two side edges, then one line per
-  // level boundary (i = 0 is the bottom edge, LEVEL_MAX the top), drawn
-  // after the side edges so the highlighted ones paint over them; refresh
-  // restrokes those to highlight the focus level. Seen from above, the
-  // plane shown is always the focus level: one outline, always highlighted.
-  const frameGroup = svgEl("g", { id: `${config.prefix}-frame`, "pointer-events": "none" });
-  const left = 0.5, right = config.cols + 0.5, bottom = 0.5, top = config.rows + 0.5;
-  const sideEdges = [];
-  const frameLines = [];
-  let outline = null;
-  if (config.rowsAreLevels) {
-    for (const col of [left, right]) {
-      const line = svgEl("line", { stroke: PERIMETER_COLOR, "stroke-width": 3 });
-      sideEdges.push({ el: line, col });
-      frameGroup.appendChild(line);
-    }
-    for (let boundaryIndex = 0; boundaryIndex <= LEVEL_MAX; boundaryIndex++) {
-      const line = svgEl("line", {
-        stroke: perimeterStroke(boundaryIndex, state.level),
-        "stroke-width": 3,
-        "stroke-linecap": "square",
-      });
-      frameLines.push({ el: line, boundaryIndex });
-      frameGroup.appendChild(line);
-    }
-  } else {
-    outline = svgEl("polygon", {
-      fill: "none",
-      stroke: PERIMETER_HIGHLIGHT,
-      "stroke-width": 3,
-    });
-    frameGroup.appendChild(outline);
-  }
   el.appendChild(frameGroup);
-
-  const piecesEl = svgEl("g", { id: `${config.prefix}-pieces`, "pointer-events": "none" });
   el.appendChild(piecesEl);
+  let squares = [];
+  let frameLines = [];
 
   // The title, with the plane shown under it; placed by layout.
   const subtitleText = () => `${config.planeName} ${plane}`;
@@ -189,49 +167,138 @@ const buildSliceView = (config, bbox, state) => {
   el.appendChild(subtitleEl);
 
   // The plane picker, a gap right of the grid as drawn in Basic mode (the
-  // Iso grid is no wider), centered on it.
+  // Iso grid is no wider), centered on it; layout moves it right of an
+  // exploded set.
   const planePicker = buildPlanePicker(center.x + config.cols * PITCH / 2 + PITCH * 0.3, center.y, {
     id: `${config.prefix}-plane-picker`,
     field: config.planeField, label: config.planeLabel, max: config.planeMax,
     initial: plane,
   });
   el.appendChild(planePicker.el);
+  const pickerGap = PITCH * 0.3;
 
-  // Places the grid, frame and title for `mode`.
-  const layout = (mode) => {
-    viewMode = mode;
+  // The slices to draw for `mode` with plane `selected` selected. Exploded:
+  // planes planeMax..1 left to right along the axis, sized and packed so
+  // they exactly fill the width from the bbox's left edge to a gap left of
+  // the plane picker (moved to the bbox's right edge), centered vertically.
+  const placedSlices = (mode, selected) => {
+    if (!exploded(mode)) return [{ plane: null, center, scale: 1 }];
+    const { axis } = config.isoXExplode;
+    const planes = Array.from({ length: config.planeMax }, (_, i) => config.planeMax - i);
+    const availMinX = bbox.minX;
+    const availMaxX = bbox.maxX - (planePicker.maxX - planePicker.minX) - pickerGap;
+    const unitW = config.cols * Math.abs(steps.col.x);
+    const n = planes.length;
+    const small = (availMaxX - availMinX - (n - 1) * EXPLODE_GAP) / (unitW * (n - 1 + EXPLODE_SELECTED_SCALE));
+    let cursor = 0;
+    const slices = planes.map((p) => {
+      const scale = small * (p === selected ? EXPLODE_SELECTED_SCALE : 1);
+      const w = unitW * scale;
+      const x = cursor + w / 2;
+      cursor += w + EXPLODE_GAP;
+      return { plane: p, center: { x, y: x * axis.y / axis.x }, scale };
+    });
+    const pts = slices.flatMap(outerCorners);
+    const minX = Math.min(...pts.map((q) => q.x));
+    const minY = Math.min(...pts.map((q) => q.y)), maxY = Math.max(...pts.map((q) => q.y));
+    const dx = availMinX - minX, dy = center.y - (minY + maxY) / 2;
+    return slices.map((sl) => ({ ...sl, center: { x: sl.center.x + dx, y: sl.center.y + dy } }));
+  };
+
+  // Rebuilds the squares and frames for `mode` with plane `selected`, and
+  // places the title above them and the plane picker right of them.
+  const layout = (mode, selected) => {
+    laidOutFor = layoutKey(mode, selected);
     steps = gridSteps(config, mode);
-    for (const { col, row, checkerEl, diagEl } of squares) {
-      checkerEl.setAttribute("points", pointsAttr(squareCorners(col, row)));
-      diagEl.setAttribute("points", pointsAttr(squareCorners(col, row, DIAG_INSET)));
+    const slices = placedSlices(mode, selected);
+    checkerGroup.replaceChildren();
+    diagGroup.replaceChildren();
+    frameGroup.replaceChildren();
+    squares = [];
+    frameLines = [];
+    const line = (a, b, attrs) => frameGroup.appendChild(svgEl("line", {
+      x1: a.x, y1: a.y, x2: b.x, y2: b.y, ...attrs,
+    }));
+    for (const slice of slices) {
+      forEachSliceSquare(config, (col, row) => {
+        const checkerEl = svgEl("polygon", {
+          points: pointsAttr(squareCorners(slice, col, row)),
+          style: "cursor: pointer",
+        });
+        // Clicking a square selects its cell: one display-change per field,
+        // handled like the cell indicator cube's. In an exploded view, a
+        // square in a slice other than the selected one selects only that
+        // slice's plane instead. Fired from the view's root, which stays in
+        // the scene while a change relays an exploded view out.
+        checkerEl.addEventListener("click", () => {
+          if (slice.plane !== null && slice.plane !== plane) {
+            emitDisplayChange(el, config.planeField, slice.plane);
+            return;
+          }
+          const { level, rank, file } = config.cellAt(col, row, planeOf(slice));
+          emitDisplayChange(el, "level", level);
+          emitDisplayChange(el, "rank", rank);
+          emitDisplayChange(el, "file", file);
+        });
+        checkerGroup.appendChild(checkerEl);
+        const diagEl = svgEl("polygon", {
+          points: pointsAttr(squareCorners(slice, col, row, DIAG_INSET)),
+          fill: "none",
+          "stroke-width": Math.max(1, DIAG_SQUARE_STROKE_WIDTH * slice.scale),
+        });
+        diagGroup.appendChild(diagEl);
+        squares.push({ slice, col, row, checkerEl, diagEl });
+      });
+
+      // The frame. With rows as levels: the two side edges, then one line
+      // per level boundary (i = 0 is the bottom edge, LEVEL_MAX the top),
+      // drawn after the side edges so the highlighted ones paint over them;
+      // refresh restrokes those to highlight the focus level. Seen from
+      // above, the plane shown is always the focus level: one outline,
+      // always highlighted.
+      const strokeWidth = Math.max(1, 3 * slice.scale);
+      if (config.rowsAreLevels) {
+        for (const col of [left, right]) {
+          line(gridPoint(slice, col, bottom), gridPoint(slice, col, top),
+            { stroke: PERIMETER_COLOR, "stroke-width": strokeWidth });
+        }
+        for (let boundaryIndex = 0; boundaryIndex <= LEVEL_MAX; boundaryIndex++) {
+          const lineEl = line(gridPoint(slice, left, boundaryIndex + 0.5), gridPoint(slice, right, boundaryIndex + 0.5),
+            { "stroke-width": strokeWidth, "stroke-linecap": "square" });
+          frameLines.push({ el: lineEl, boundaryIndex });
+        }
+      } else {
+        frameGroup.appendChild(svgEl("polygon", {
+          points: pointsAttr(outerCorners(slice)),
+          fill: "none",
+          stroke: PERIMETER_HIGHLIGHT,
+          "stroke-width": strokeWidth,
+        }));
+      }
     }
-    const setLine = (line, a, b) => {
-      line.setAttribute("x1", a.x); line.setAttribute("y1", a.y);
-      line.setAttribute("x2", b.x); line.setAttribute("y2", b.y);
-    };
-    for (const { el: line, col } of sideEdges) setLine(line, gridPoint(col, bottom), gridPoint(col, top));
-    for (const { el: line, boundaryIndex } of frameLines) {
-      setLine(line, gridPoint(left, boundaryIndex + 0.5), gridPoint(right, boundaryIndex + 0.5));
-    }
-    const corners = [gridPoint(left, bottom), gridPoint(right, bottom), gridPoint(right, top), gridPoint(left, top)];
-    if (outline) outline.setAttribute("points", pointsAttr(corners));
-    // Above the grid's highest corner.
-    const gridTop = Math.min(...corners.map((p) => p.y));
-    const newTitle = buildViewTitle(config.title, center.x, gridTop - VIEW_SUBTITLE_LINE, `${config.prefix}-title`);
-    const newSubtitle = buildViewSubtitle(subtitleText(), center.x, gridTop, `${config.prefix}-subtitle`);
+
+    // The title above the highest corner of all the slices, centered on them.
+    const pts = slices.flatMap(outerCorners);
+    const minX = Math.min(...pts.map((q) => q.x)), maxX = Math.max(...pts.map((q) => q.x));
+    const gridTop = Math.min(...pts.map((q) => q.y));
+    const titleX = (minX + maxX) / 2;
+    const newTitle = buildViewTitle(config.title, titleX, gridTop - VIEW_SUBTITLE_LINE, `${config.prefix}-title`);
+    const newSubtitle = buildViewSubtitle(subtitleText(), titleX, gridTop, `${config.prefix}-subtitle`);
     titleEl.replaceWith(newTitle);
     subtitleEl.replaceWith(newSubtitle);
     titleEl = newTitle;
     subtitleEl = newSubtitle;
-  };
-  layout(viewMode);
 
-  // Recolors every square and redraws the pieces for the plane `state`
-  // picks, highlights the focus level's boundary lines, and relays the grid
-  // out when the view mode has changed.
+    const pickerDx = exploded(mode) ? maxX + pickerGap - planePicker.minX : 0;
+    planePicker.el.setAttribute("transform", `translate(${pickerDx.toFixed(2)}, 0)`);
+  };
+
+  // Relays the slices out when the layout key has changed, then recolors
+  // every square, redraws the pieces and highlights the focus level's
+  // boundary lines.
   const refresh = (state) => {
     plane = config.plane(state);
-    if (state.viewMode !== viewMode) layout(state.viewMode);
+    if (layoutKey(state.viewMode, plane) !== laidOutFor) layout(state.viewMode, plane);
     subtitleEl.textContent = subtitleText();
     planePicker.setValue(plane);
     for (const { el: line, boundaryIndex } of frameLines) {
@@ -239,16 +306,22 @@ const buildSliceView = (config, bbox, state) => {
     }
     diagGroup.setAttribute("display", state.show3dDiagonals ? "inline" : "none");
     piecesEl.replaceChildren();
-    for (const { col, row, checkerEl, diagEl } of squares) {
-      const cell = config.cellAt(col, row, plane);
+    for (const { slice, col, row, checkerEl, diagEl } of squares) {
+      const cell = config.cellAt(col, row, planeOf(slice));
       const { rank, level, file } = cell;
       const variant = isDarkCell(rank, level, file) ? "dark" : "light";
       checkerEl.setAttribute("fill", checkerColor(level, variant, state.level));
       diagEl.setAttribute("stroke", DIAG_COLORS[diagForCell(rank, level, file)]);
       const piece = pieceAt(cell);
-      if (piece) renderPieceIcon(piece.type, piece.color, gridPoint(col, row), piecesEl);
+      if (piece) {
+        const icon = renderPieceIcon(piece.type, piece.color, gridPoint(slice, col, row), piecesEl);
+        if (slice.scale !== 1) {
+          icon.setAttribute("transform", `${icon.getAttribute("transform")} scale(${slice.scale.toFixed(4)})`);
+        }
+      }
     }
   };
+  refresh(state);
 
   return { el, refresh };
 };

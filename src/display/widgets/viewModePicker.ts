@@ -16,7 +16,7 @@ import { TEXT_STYLE, makePanelRect, makeHitRect, emitDisplayChange } from './wid
 const OPTIONS = [
   { id: "basic", label: "Basic" },
   { id: "iso", label: "Iso" },
-  // { id: "isoX", label: "Iso-X" },
+  { id: "isoX", label: "Iso-X" },
 ];
 const CAPTION = "View Mode";
 
